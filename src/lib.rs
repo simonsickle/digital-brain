@@ -22,6 +22,13 @@
 //! │   Memory    │ Consolidate │   Valence   │   Router    │ Model  │
 //! └─────────────┴─────────────┴─────────────┴─────────────┴────────┘
 //! ```
+//!
+//! ## Core Components
+//!
+//! - **Signal Protocol**: Universal inter-module communication
+//! - **Hippocampus**: Long-term memory with valence-weighted retrieval
+//! - **Prediction Engine**: Dopamine-like surprise and learning modulation
+//! - **Global Workspace**: Consciousness layer with attention competition
 
 pub mod signal;
 pub mod error;
@@ -30,10 +37,12 @@ pub mod core;
 
 pub use signal::{BrainSignal, SignalType, MemoryTrace, Valence, Salience, Arousal};
 pub use error::{BrainError, Result};
+pub use core::{GlobalWorkspace, PredictionEngine, Prediction, PredictionError, Broadcast};
 
 /// Prelude for convenient imports
 pub mod prelude {
     pub use crate::signal::*;
     pub use crate::error::*;
     pub use crate::regions::hippocampus::HippocampusStore;
+    pub use crate::core::{GlobalWorkspace, PredictionEngine, Prediction, Broadcast};
 }

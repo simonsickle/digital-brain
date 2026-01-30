@@ -7,6 +7,7 @@
 //! - Strategic forgetting (valence-weighted decay)
 
 use crate::error::{BrainError, Result};
+#[allow(unused_imports)]
 use crate::signal::{BrainSignal, MemoryTrace, SignalType};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection};
