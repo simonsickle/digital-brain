@@ -4,6 +4,4 @@ pub mod hippocampus;
 pub mod amygdala;
 pub mod prefrontal;
 pub mod thalamus;
-
-// Placeholder modules for future implementation
-// pub mod dmn;
+pub mod dmn;
