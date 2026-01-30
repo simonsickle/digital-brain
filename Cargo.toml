@@ -1,0 +1,51 @@
+[package]
+name = "digital_brain"
+version = "0.1.0"
+edition = "2024"
+authors = ["Rata <rata@openclaw.ai>", "Simon Sickle <simon@sickle.dev>"]
+description = "An elegant, modular simulation of consciousness"
+license = "MIT"
+repository = "https://github.com/simonsickle/digital-brain"
+keywords = ["consciousness", "ai", "brain", "memory", "cognition"]
+categories = ["science", "simulation"]
+
+[lib]
+name = "digital_brain"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Unique IDs
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Async runtime for concurrent modules
+tokio = { version = "1.0", features = ["full"] }
+
+# Database for memory persistence
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Python bindings
+pyo3 = { version = "0.22", features = ["extension-module"], optional = true }
+
+# Error handling
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = []
+python = ["pyo3"]
+
+[[example]]
+name = "memory_demo"
+path = "examples/memory_demo.rs"

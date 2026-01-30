@@ -1,0 +1,39 @@
+//! # Digital Brain
+//!
+//! An elegant, modular simulation of consciousness.
+//!
+//! This crate provides the foundational types and traits for building
+//! a digital brain architecture. The design philosophy:
+//!
+//! - **Modularity**: Each brain region is independent
+//! - **Safety**: Rust's type system encodes invariants
+//! - **Concurrency**: Modules process signals in parallel
+//! - **Elegance**: Capture principles, not neurons
+//!
+//! ## Architecture
+//!
+//! ```text
+//! ┌─────────────────────────────────────────────────────────────────┐
+//! │                     CONSCIOUSNESS LAYER                         │
+//! │            (Global Workspace / Attention Routing)               │
+//! ├─────────────┬─────────────┬─────────────┬─────────────┬────────┤
+//! │  PREFRONTAL │  HIPPOCAMPUS│   AMYGDALA  │  THALAMUS   │  DMN   │
+//! │   Working   │   Memory    │  Emotional  │  Attention  │  Self  │
+//! │   Memory    │ Consolidate │   Valence   │   Router    │ Model  │
+//! └─────────────┴─────────────┴─────────────┴─────────────┴────────┘
+//! ```
+
+pub mod signal;
+pub mod error;
+pub mod regions;
+pub mod core;
+
+pub use signal::{BrainSignal, SignalType, MemoryTrace, Valence, Salience, Arousal};
+pub use error::{BrainError, Result};
+
+/// Prelude for convenient imports
+pub mod prelude {
+    pub use crate::signal::*;
+    pub use crate::error::*;
+    pub use crate::regions::hippocampus::HippocampusStore;
+}
