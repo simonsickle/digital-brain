@@ -14,7 +14,6 @@ use crate::signal::{BrainSignal, SignalType, Salience, Arousal};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use uuid::Uuid;
 
 /// Configuration for thalamic processing.
 #[derive(Debug, Clone)]

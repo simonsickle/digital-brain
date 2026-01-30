@@ -207,7 +207,7 @@ impl PrefrontalCortex {
 
     /// Count items, treating chunks as single items.
     fn effective_item_count(&self) -> usize {
-        let chunked_items: usize = self.chunks.iter().map(|c| c.size()).sum();
+        let _chunked_items: usize = self.chunks.iter().map(|c| c.size()).sum();
         let standalone_items = self.items.iter()
             .filter(|i| i.chunk_id.is_none())
             .count();

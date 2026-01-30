@@ -9,7 +9,7 @@ use crate::regions::amygdala::{Amygdala, EmotionalAppraisal};
 use crate::regions::dmn::{DefaultModeNetwork, Identity, Belief, BeliefCategory, ReflectionTrigger};
 use crate::regions::hippocampus::HippocampusStore;
 use crate::regions::prefrontal::{PrefrontalCortex, PrefrontalConfig};
-use crate::regions::thalamus::{Thalamus, ThalamusConfig, RoutedSignal, Destination};
+use crate::regions::thalamus::{Thalamus, Destination};
 use crate::signal::{BrainSignal, SignalType, MemoryTrace};
 use crate::error::Result;
 
@@ -75,6 +75,7 @@ pub struct Brain {
     /// Processing cycle count
     cycle_count: u64,
     /// Configuration
+    #[allow(dead_code)]
     config: BrainConfig,
 }
 
@@ -256,7 +257,7 @@ impl Brain {
     }
 
     /// Recall memories related to a query.
-    pub fn recall(&mut self, query: &str, limit: usize) -> Result<Vec<MemoryTrace>> {
+    pub fn recall(&mut self, _query: &str, limit: usize) -> Result<Vec<MemoryTrace>> {
         // For now, just retrieve by valence boost
         // TODO: Implement semantic search
         self.hippocampus.retrieve(limit, true)

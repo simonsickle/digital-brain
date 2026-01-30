@@ -145,12 +145,32 @@ brain.reflect("my recent experiences")
 ## Examples
 
 ```bash
-# Memory demo
+# Memory demo - basic memory operations
 cargo run --example memory_demo
 
-# Full consciousness demo
+# Consciousness demo - full cognitive cycle
 cargo run --example consciousness_demo
+
+# Interconnect demo - visualize architecture (animated)
+cargo run --example interconnect_demo
+
+# Live interconnect - real signal processing with output
+cargo run --example live_interconnect
 ```
+
+### Interconnect Demo
+
+The interconnect demo shows how signals flow through the architecture step-by-step:
+
+```
+External Input → Thalamus (gating) → Amygdala (emotion) → 
+    ├→ Hippocampus (memory)
+    ├→ Prefrontal (working memory)  
+    ├→ Prediction Engine (surprise)
+    └→ Global Workspace (consciousness) → DMN (self-model)
+```
+
+This visualization explains *why* this architecture matters for consciousness.
 
 ## Testing
 
