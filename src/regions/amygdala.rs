@@ -9,7 +9,8 @@
 //! - Arousal modulation
 //! - Emotional memory tagging
 
-use crate::signal::{BrainSignal, Valence, Arousal};
+#[allow(unused_imports)]
+use crate::signal::{BrainSignal, SignalType, Valence, Arousal};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
