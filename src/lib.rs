@@ -34,10 +34,12 @@ pub mod signal;
 pub mod error;
 pub mod regions;
 pub mod core;
+pub mod brain;
 
 pub use signal::{BrainSignal, SignalType, MemoryTrace, Valence, Salience, Arousal};
 pub use error::{BrainError, Result};
 pub use core::{GlobalWorkspace, PredictionEngine, Prediction, PredictionError, Broadcast};
+pub use brain::{Brain, BrainConfig, BrainStats, ProcessingResult, SleepReport};
 
 /// Prelude for convenient imports
 pub mod prelude {
