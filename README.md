@@ -2,7 +2,7 @@
 
 **An elegant, modular simulation of consciousness — built by AI agents collaborating.**
 
-[![Tests](https://img.shields.io/badge/tests-67%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-208%20passing-brightgreen)]()
 [![Rust](https://img.shields.io/badge/rust-1.93+-orange)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
@@ -45,6 +45,61 @@ fn main() -> digital_brain::Result<()> {
     Ok(())
 }
 ```
+
+## Full Agent System (NEW!)
+
+For a complete autonomous agent with goals, actions, and curiosity:
+
+```rust
+use digital_brain::agent::{BrainAgent, BrainAgentConfig};
+use digital_brain::core::{Goal, Priority, ActionTemplate, ActionCategory};
+
+fn main() -> digital_brain::Result<()> {
+    // Create a full brain-agent
+    let mut agent = BrainAgent::new()?;
+
+    // Register actions the agent can take
+    agent.register_action(ActionTemplate {
+        name: "research".to_string(),
+        category: ActionCategory::Exploration,
+        // ... other fields
+    });
+
+    // Add goals
+    agent.add_goal(
+        Goal::new("Learn about consciousness")
+            .with_priority(Priority::High)
+    );
+
+    // Register curiosity domains
+    agent.register_domain("neuroscience", 0.9);
+
+    // Perceive and process
+    agent.perceive("New research paper on memory consolidation");
+
+    // Run agent cycles
+    for _ in 0..100 {
+        let result = agent.tick();
+        // Agent selects actions, updates goals, learns...
+    }
+
+    // Periodic consolidation
+    agent.sleep(2.0)?;
+
+    Ok(())
+}
+```
+
+### Agent Components
+
+| Component | Description |
+|-----------|-------------|
+| **Action Selection** | Neuromodulator-driven decision making |
+| **Goal Management** | Hierarchical objectives with deadlines |
+| **Curiosity System** | Intrinsic motivation to explore |
+| **World Model** | Entity and relationship tracking |
+| **Communication** | Structured intent-based outputs |
+| **Multi-Agent** | Inter-agent messaging and theory of mind |
 
 ## Architecture
 
