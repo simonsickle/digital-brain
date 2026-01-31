@@ -8,6 +8,7 @@ pub mod nervous_system;
 pub mod neuromodulators;
 pub mod prediction;
 pub mod workspace;
+pub mod world_model;
 
 pub use attention::{
     AttentionBudget, AttentionStats, COMPLEXITY_KEYWORDS, TaskComplexity, estimate_complexity,
@@ -23,6 +24,10 @@ pub use neuromodulators::{
 };
 pub use prediction::{Prediction, PredictionEngine, PredictionError, PredictionStats};
 pub use workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
+pub use world_model::{
+    Entity, EntityId, PropertyValue, PredictionId, RelationType, Relationship, WorldModel,
+    WorldModelStats, WorldPrediction,
+};
 pub use action::{
     ActionCategory, ActionDecision, ActionId, ActionSelector, ActionStats, ActionTemplate,
     Condition, ExpectedOutcome, Outcome,
