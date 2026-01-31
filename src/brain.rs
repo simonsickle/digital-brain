@@ -23,6 +23,7 @@ use crate::regions::dmn::{
 use crate::regions::hippocampus::HippocampusStore;
 use crate::regions::prefrontal::{PrefrontalConfig, PrefrontalCortex};
 use crate::regions::schema::{Schema, SchemaCategory, SchemaStats, SchemaStore};
+use crate::regions::stn::{STN, StopReason, StopSignal, TaskConfig, TaskId};
 use crate::regions::thalamus::{Destination, Thalamus};
 use crate::signal::{BrainSignal, MemoryTrace, Salience, SignalType};
 
@@ -99,6 +100,8 @@ pub struct Brain {
     pub acc: ACC,
     /// Procedural memory and timing
     pub cerebellum: Cerebellum,
+    /// Response inhibition and task watchdog
+    pub stn: STN,
     /// Processing cycle count
     cycle_count: u64,
     /// Configuration
@@ -144,6 +147,7 @@ impl Brain {
             basal_ganglia: BasalGanglia::new(),
             acc: ACC::new(),
             cerebellum: Cerebellum::new(),
+            stn: STN::new(),
             cycle_count: 0,
             config,
         })
@@ -1050,9 +1054,7 @@ impl Brain {
         self.cerebellum.practice(id, success, execution_time);
 
         // If practice failed, register with ACC
-        if !success
-            && let Some(proc) = self.cerebellum.get(id)
-        {
+        if !success && let Some(proc) = self.cerebellum.get(id) {
             self.acc
                 .action_error(&proc.name, "procedure execution failed", 0.3);
         }
@@ -1082,6 +1084,102 @@ impl Brain {
     /// Record actual timing (for learning)
     pub fn record_timing(&mut self, event: &str) {
         self.cerebellum.record_timing(event, chrono::Utc::now());
+    }
+
+    // --- STN (Response Inhibition / Task Watchdog) ---
+
+    /// Start monitoring a task with custom config
+    pub fn monitor_task(&mut self, name: &str, config: TaskConfig) -> TaskId {
+        self.stn.monitor(name, config)
+    }
+
+    /// Start monitoring a task with default timeouts
+    pub fn monitor_task_default(&mut self, name: &str) -> TaskId {
+        self.stn.monitor_default(name)
+    }
+
+    /// Record progress on a monitored task
+    pub fn task_progress(&mut self, task_id: TaskId) {
+        self.stn.progress(task_id);
+    }
+
+    /// Record effort spent on a task
+    pub fn task_effort(&mut self, task_id: TaskId, amount: f64) {
+        self.stn.effort(task_id, amount);
+    }
+
+    /// Record reward for a task
+    pub fn task_reward(&mut self, task_id: TaskId, amount: f64) {
+        self.stn.reward(task_id, amount);
+    }
+
+    /// Record a signal/action for loop detection
+    pub fn task_signal(&mut self, task_id: TaskId, signal: &str) {
+        self.stn.signal(task_id, signal);
+    }
+
+    /// Mark a task as completed
+    pub fn complete_task(&mut self, task_id: TaskId) {
+        self.stn.complete(task_id);
+    }
+
+    /// Stop a task manually
+    pub fn stop_task(&mut self, task_id: TaskId, reason: StopReason) {
+        self.stn.stop(task_id, reason.clone());
+
+        // Register with ACC
+        if let Some(task) = self.stn.get_task(task_id) {
+            self.acc
+                .action_error(&task.name, &format!("stopped: {:?}", reason), 0.5);
+        }
+    }
+
+    /// Trigger global stop (emergency brake)
+    pub fn emergency_stop(&mut self, reason: &str) {
+        self.stn.global_stop(reason);
+
+        // High-severity ACC alert
+        self.acc.action_error("GLOBAL", reason, 1.0);
+    }
+
+    /// Check all tasks and return any that were stopped
+    pub fn check_tasks(&mut self) -> Vec<StopSignal> {
+        let signals = self.stn.check_all();
+
+        // Register stopped tasks with ACC
+        for signal in &signals {
+            if signal.reason != StopReason::Completed {
+                self.acc.action_error(
+                    &signal.task_name,
+                    &format!("{:?}", signal.reason),
+                    match signal.reason {
+                        StopReason::Timeout => 0.6,
+                        StopReason::NoProgress => 0.5,
+                        StopReason::ResourceExhaustion => 0.7,
+                        StopReason::Habituation => 0.4,
+                        StopReason::NoRewardHighEffort => 0.5,
+                        _ => 0.5,
+                    },
+                );
+            }
+        }
+
+        signals
+    }
+
+    /// Is global inhibition currently active?
+    pub fn is_inhibited(&self) -> bool {
+        self.stn.is_globally_inhibited()
+    }
+
+    /// Get all running tasks
+    pub fn running_tasks(&self) -> Vec<&crate::regions::stn::MonitoredTask> {
+        self.stn.running_tasks()
+    }
+
+    /// Drain pending stop signals
+    pub fn drain_stop_signals(&mut self) -> Vec<StopSignal> {
+        self.stn.drain_signals()
     }
 
     // --- Persistence Methods ---

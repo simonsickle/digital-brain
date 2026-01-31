@@ -51,6 +51,7 @@ pub enum BrainRegion {
     BasalGanglia,
     ACC,
     Cerebellum,
+    STN,      // Subthalamic Nucleus - response inhibition
     External, // Input/output to outside world
 }
 
@@ -67,6 +68,7 @@ impl BrainRegion {
             BrainRegion::BasalGanglia => "BasalGanglia",
             BrainRegion::ACC => "ACC",
             BrainRegion::Cerebellum => "Cerebellum",
+            BrainRegion::STN => "STN",
             BrainRegion::External => "External",
         }
     }

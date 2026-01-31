@@ -11,6 +11,7 @@
 //! - **basal_ganglia**: Action selection, habit formation
 //! - **acc**: Error detection, conflict monitoring
 //! - **cerebellum**: Procedural memory, timing, motor learning
+//! - **stn**: Response inhibition, task watchdog, emergency brake
 
 pub mod acc;
 pub mod amygdala;
@@ -20,9 +21,11 @@ pub mod dmn;
 pub mod hippocampus;
 pub mod prefrontal;
 pub mod schema;
+pub mod stn;
 pub mod thalamus;
 
 // Re-export key types
 pub use acc::{ACC, Conflict, ControlSignal, Error, ErrorType};
 pub use basal_ganglia::{ActionPattern, BasalGanglia, GateDecision, SelectionResult};
 pub use cerebellum::{Cerebellum, Procedure, ProcedureStep, TimingPrediction};
+pub use stn::{MonitoredTask, STN, StopReason, StopSignal, TaskConfig, TaskId, TaskState};
