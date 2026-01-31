@@ -1,6 +1,6 @@
 //! Neuromodulatory System - Global State Regulation
 //!
-//! This module implements the four major neuromodulatory systems that globally
+//! This module implements the major neuromodulatory systems that globally
 //! regulate brain state and behavior. Unlike the existing prediction engine
 //! (which handles dopamine-like surprise), this provides a complete framework.
 //!
@@ -15,13 +15,18 @@
 //! 4. **Delayed evaluation**: Post-hoc assessment allows regret/learning
 //! 5. **Homeostatic regulation**: All systems return to baseline, preventing runaway states
 //! 6. **Cross-modulation**: Systems inhibit/enhance each other for balance
+//! 7. **GABA inhibition**: Impulse control prevents hasty actions
+//! 8. **Oxytocin trust**: Social bonding promotes cooperation over adversarial behavior
 //!
-//! # The Four Systems
+//! # The Seven Systems
 //!
 //! - **Dopamine**: Reward prediction, motivation, wanting (NOT just pleasure)
 //! - **Serotonin**: Patience, mood stability, long-term thinking
 //! - **Norepinephrine**: Arousal, vigilance, focused attention
 //! - **Acetylcholine**: Learning enhancement, memory encoding, sustained attention
+//! - **Cortisol**: Sustained stress, adaptation, exploration drive
+//! - **GABA**: Inhibitory control, impulse prevention, deliberation
+//! - **Oxytocin**: Trust, cooperation, social bonding
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -757,9 +762,585 @@ impl Default for AcetylcholineSystem {
     }
 }
 
+/// The Cortisol System - Sustained Stress and Adaptation
+///
+/// Cortisol is the "slow stress" hormone that builds up from repeated failures
+/// and sustained challenges. Unlike norepinephrine (immediate alertness),
+/// cortisol operates on a longer timescale and triggers strategic adaptation.
+///
+/// Key behaviors:
+/// - **Moderate cortisol**: Promotes exploration, strategy switching, trying new approaches
+/// - **High cortisol**: Triggers help-seeking, breaks, prevents thrashing
+/// - **Chronic high cortisol**: Impairs learning, causes avoidance (burnout simulation)
+///
+/// Triggers:
+/// - Repeated failures (build errors, test failures)
+/// - Same error appearing multiple times
+/// - Goals blocked for too long
+/// - Accumulated prediction errors
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CortisolSystem {
+    /// Current cortisol level
+    pub level: ModulatorLevel,
+    /// Failure accumulator (recent failure count)
+    failure_count: u32,
+    /// Consecutive failures (resets on success)
+    consecutive_failures: u32,
+    /// Same-error repetition tracker
+    repeated_errors: HashMap<String, u32>,
+    /// Time since last success (in cycles)
+    cycles_since_success: u32,
+    /// Chronic stress indicator (sustained high cortisol)
+    chronic_stress: f64,
+}
+
+impl CortisolSystem {
+    pub fn new() -> Self {
+        Self {
+            level: ModulatorLevel::new(0.2), // Low baseline - calm state
+            failure_count: 0,
+            consecutive_failures: 0,
+            repeated_errors: HashMap::new(),
+            cycles_since_success: 0,
+            chronic_stress: 0.0,
+        }
+    }
+
+    /// Signal a failure event (build error, test failure, etc.)
+    pub fn signal_failure(&mut self, error_signature: Option<&str>) {
+        self.failure_count += 1;
+        self.consecutive_failures += 1;
+        self.cycles_since_success += 1;
+
+        // Base cortisol increase from failure
+        let base_increase = 0.1;
+
+        // Consecutive failures compound the stress
+        let consecutive_multiplier = 1.0 + (self.consecutive_failures as f64 * 0.2).min(2.0);
+
+        // Check for repeated same error (very frustrating!)
+        let repetition_bonus = if let Some(sig) = error_signature {
+            let count = self.repeated_errors.entry(sig.to_string()).or_insert(0);
+            *count += 1;
+            if *count > 2 {
+                (*count as f64 - 2.0) * 0.15 // Extra stress for repeated same error
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+
+        let total_increase = base_increase * consecutive_multiplier + repetition_bonus;
+        self.level.adjust(total_increase);
+
+        // Update chronic stress if sustained
+        if self.level.current() > 0.6 {
+            self.chronic_stress = (self.chronic_stress + 0.05).min(1.0);
+        }
+    }
+
+    /// Signal a success event (build passed, test passed, goal achieved)
+    pub fn signal_success(&mut self) {
+        // Success reduces cortisol
+        self.level.adjust(-0.15);
+
+        // Reset consecutive failure counter
+        self.consecutive_failures = 0;
+        self.cycles_since_success = 0;
+
+        // Clear repeated error tracking (fresh start)
+        self.repeated_errors.clear();
+
+        // Chronic stress slowly recovers
+        self.chronic_stress = (self.chronic_stress - 0.1).max(0.0);
+    }
+
+    /// Get exploration drive (moderate cortisol promotes trying new things)
+    pub fn exploration_drive(&self) -> f64 {
+        let level = self.level.current();
+
+        // Inverted-U curve: moderate cortisol maximizes exploration
+        // Low cortisol: content with current approach
+        // Moderate cortisol: "this isn't working, try something new"
+        // High cortisol: too stressed to explore effectively
+        if level < 0.3 {
+            level * 2.0 // Low: exploration increases with stress
+        } else if level < 0.6 {
+            1.0 - (level - 0.3) * 0.5 // Moderate: peak exploration, slight decline
+        } else {
+            0.7 - (level - 0.6) * 1.5 // High: exploration decreases (tunnel vision)
+        }
+    }
+
+    /// Should we try a completely different approach?
+    pub fn should_pivot(&self) -> bool {
+        // Pivot when moderately stressed with repeated failures
+        self.level.current() > 0.4 && self.consecutive_failures >= 3
+    }
+
+    /// Should we ask for help or take a break?
+    pub fn should_seek_help(&self) -> bool {
+        // Seek help when highly stressed or chronically stressed
+        self.level.current() > 0.7 || self.chronic_stress > 0.5
+    }
+
+    /// Should we take a break? (prevents thrashing)
+    pub fn should_take_break(&self) -> bool {
+        // Take a break when very high cortisol or many consecutive failures
+        self.level.current() > 0.85 || self.consecutive_failures >= 5
+    }
+
+    /// Get confidence reduction (high cortisol reduces confidence in current approach)
+    pub fn confidence_penalty(&self) -> f64 {
+        // Returns a multiplier for confidence (1.0 = no penalty, 0.5 = halved confidence)
+        let level = self.level.current();
+        if level < 0.3 {
+            1.0
+        } else {
+            1.0 - (level - 0.3) * 0.7 // Max 70% confidence reduction at full cortisol
+        }
+    }
+
+    /// Get learning impairment (chronic high cortisol impairs learning)
+    pub fn learning_impairment(&self) -> f64 {
+        // Returns a multiplier for learning rate (1.0 = normal, 0.5 = halved)
+        let acute = self.level.current();
+        let chronic = self.chronic_stress;
+
+        // Both acute and chronic stress impair learning
+        let acute_penalty = if acute > 0.6 {
+            (acute - 0.6) * 0.5
+        } else {
+            0.0
+        };
+        let chronic_penalty = chronic * 0.3;
+
+        (1.0 - acute_penalty - chronic_penalty).max(0.3)
+    }
+
+    /// Is the system in a burnout state?
+    pub fn is_burned_out(&self) -> bool {
+        self.chronic_stress > 0.7
+    }
+
+    /// Get the frustration level (for decision making)
+    pub fn frustration(&self) -> f64 {
+        let from_failures = (self.consecutive_failures as f64 * 0.15).min(0.5);
+        let from_cortisol = self.level.current() * 0.5;
+        (from_failures + from_cortisol).min(1.0)
+    }
+
+    /// Cycle update
+    pub fn update(&mut self) {
+        self.level.regulate();
+
+        // Time-based stress increase if no success
+        if self.cycles_since_success > 10 {
+            self.level.adjust(0.01); // Slow background stress accumulation
+        }
+
+        // Chronic stress slowly decays if cortisol is low
+        if self.level.current() < 0.4 {
+            self.chronic_stress = (self.chronic_stress - 0.02).max(0.0);
+        }
+
+        // Decay failure count over time
+        if self.failure_count > 0 {
+            self.failure_count = self.failure_count.saturating_sub(1);
+        }
+
+        self.cycles_since_success += 1;
+    }
+
+    /// Rest/sleep drastically reduces cortisol
+    pub fn rest(&mut self) {
+        self.level.adjust(-0.3);
+        self.chronic_stress = (self.chronic_stress - 0.2).max(0.0);
+        self.consecutive_failures = 0;
+        self.repeated_errors.clear();
+    }
+}
+
+impl Default for CortisolSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// The GABA System - Inhibitory Control and Deliberation
+///
+/// GABA (γ-aminobutyric acid) is the brain's primary inhibitory neurotransmitter.
+/// It counterbalances excitatory signals and prevents impulsive actions.
+///
+/// Key behaviors:
+/// - **Action inhibition**: Prevents hasty responses, creates "pause before acting"
+/// - **Anxiety reduction**: Dampens excessive stress/worry signals
+/// - **Deliberation**: Enables thoughtful consideration before committing
+/// - **Impulse control**: Counterbalances dopamine's "want it now" drive
+///
+/// For an AI agent, GABA creates:
+/// - A pause before executing risky/irreversible actions
+/// - Time to consider alternatives before committing
+/// - Protection against "act first, think later" errors
+/// - Reduced thrashing when stressed
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GabaSystem {
+    /// Current GABA level (higher = more inhibition)
+    pub level: ModulatorLevel,
+    /// Pending action being deliberated
+    pending_action: Option<String>,
+    /// Deliberation cycles for current pending action
+    deliberation_cycles: u32,
+    /// Threshold for releasing inhibition
+    release_threshold: f64,
+    /// Impulsivity counter (recent impulsive actions)
+    impulsivity_score: f64,
+}
+
+impl GabaSystem {
+    pub fn new() -> Self {
+        Self {
+            level: ModulatorLevel::new(0.5), // Moderate baseline inhibition
+            pending_action: None,
+            deliberation_cycles: 0,
+            release_threshold: 0.6,
+            impulsivity_score: 0.0,
+        }
+    }
+
+    /// Signal an impulse (desire to act immediately)
+    /// Returns whether the action should be inhibited
+    pub fn check_impulse(&mut self, action: &str, urgency: f64, risk: f64) -> InhibitionResult {
+        // High GABA = more likely to inhibit
+        let inhibition_strength = self.level.current();
+
+        // Low urgency + high risk + high GABA = strong inhibition
+        let should_inhibit = inhibition_strength * risk > urgency * 0.8;
+
+        if should_inhibit {
+            self.pending_action = Some(action.to_string());
+            self.deliberation_cycles = 0;
+            self.level.adjust(0.05); // Successful inhibition reinforces GABA
+
+            InhibitionResult::Inhibited {
+                reason: if risk > 0.7 {
+                    "High risk action - deliberating".to_string()
+                } else {
+                    "Taking time to consider alternatives".to_string()
+                },
+                suggested_wait_cycles: (risk * 5.0) as u32 + 1,
+            }
+        } else {
+            // Action proceeds
+            self.pending_action = None;
+            self.deliberation_cycles = 0;
+
+            // If this was a high-risk action that wasn't inhibited, note impulsivity
+            if risk > 0.5 {
+                self.impulsivity_score = (self.impulsivity_score + 0.2).min(1.0);
+            }
+
+            InhibitionResult::Proceed
+        }
+    }
+
+    /// Continue deliberation on pending action
+    /// Returns true if deliberation should continue, false if ready to proceed
+    pub fn deliberate(&mut self) -> bool {
+        if self.pending_action.is_none() {
+            return false;
+        }
+
+        self.deliberation_cycles += 1;
+
+        // Inhibition weakens over time (can't deliberate forever)
+        let release_probability =
+            (self.deliberation_cycles as f64 * 0.15) / self.level.current().max(0.1);
+
+        if release_probability > self.release_threshold {
+            // Release inhibition - action can proceed
+            self.pending_action = None;
+            self.deliberation_cycles = 0;
+            false
+        } else {
+            // Continue deliberating
+            true
+        }
+    }
+
+    /// Force release of inhibition (override deliberation)
+    pub fn release(&mut self) {
+        self.pending_action = None;
+        self.deliberation_cycles = 0;
+        // Forced release slightly reduces GABA (pattern of overriding)
+        self.level.adjust(-0.05);
+    }
+
+    /// Signal that deliberation led to a good outcome
+    pub fn reward_deliberation(&mut self) {
+        self.level.adjust(0.1);
+        self.impulsivity_score = (self.impulsivity_score - 0.1).max(0.0);
+    }
+
+    /// Signal that impulsive action led to a bad outcome
+    pub fn penalize_impulsivity(&mut self) {
+        self.level.adjust(0.15); // Increase inhibition after impulsive mistakes
+        self.impulsivity_score = (self.impulsivity_score + 0.3).min(1.0);
+    }
+
+    /// Get the impulse control quality (how well we're controlling impulses)
+    pub fn impulse_control(&self) -> f64 {
+        // High GABA + low impulsivity = good impulse control
+        (self.level.current() * 0.6 + (1.0 - self.impulsivity_score) * 0.4).clamp(0.0, 1.0)
+    }
+
+    /// Should we pause before this type of action?
+    pub fn should_pause(&self, risk_level: f64) -> bool {
+        self.level.current() * risk_level > 0.3
+    }
+
+    /// Get anxiety dampening factor (high GABA reduces anxiety)
+    pub fn anxiety_dampening(&self) -> f64 {
+        self.level.current() * 0.5 + 0.5 // Range: 0.5-1.0
+    }
+
+    /// Is there a pending action being deliberated?
+    pub fn is_deliberating(&self) -> bool {
+        self.pending_action.is_some()
+    }
+
+    /// Get current impulsivity score
+    pub fn impulsivity(&self) -> f64 {
+        self.impulsivity_score
+    }
+
+    /// Cycle update
+    pub fn update(&mut self) {
+        self.level.regulate();
+        // Impulsivity slowly decays
+        self.impulsivity_score = (self.impulsivity_score - 0.02).max(0.0);
+    }
+}
+
+impl Default for GabaSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Result of impulse checking
+#[derive(Debug, Clone)]
+pub enum InhibitionResult {
+    /// Action should proceed
+    Proceed,
+    /// Action is inhibited for deliberation
+    Inhibited {
+        reason: String,
+        suggested_wait_cycles: u32,
+    },
+}
+
+/// The Oxytocin System - Trust and Cooperation
+///
+/// Oxytocin is the "trust hormone" that promotes social bonding and cooperation.
+/// For an AI agent, this enables:
+///
+/// Key behaviors:
+/// - **Trust tracking**: Remember which sources/entities are trustworthy
+/// - **Cooperation bias**: Prefer collaborative over adversarial approaches
+/// - **Reduced defensiveness**: Lower guard in trusted contexts
+/// - **Positive memory bias**: Better remember positive interactions
+///
+/// For an AI agent:
+/// - Trust the user more after positive interactions
+/// - Prefer cooperative solutions over defensive ones
+/// - Remember and weight information from trusted sources higher
+/// - Reduce unnecessary skepticism in safe contexts
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OxytocinSystem {
+    /// Current oxytocin level
+    pub level: ModulatorLevel,
+    /// Trust levels for different entities/sources
+    trust_map: HashMap<String, TrustLevel>,
+    /// Recent positive interactions
+    positive_interactions: u32,
+    /// Recent negative interactions (betrayals)
+    negative_interactions: u32,
+    /// General cooperativeness tendency
+    cooperativeness: f64,
+}
+
+/// Trust level for an entity
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustLevel {
+    /// Trust score (0-1)
+    pub score: f64,
+    /// Number of positive interactions
+    pub positive_count: u32,
+    /// Number of negative interactions
+    pub negative_count: u32,
+    /// Last interaction timestamp
+    pub last_interaction: DateTime<Utc>,
+}
+
+impl TrustLevel {
+    pub fn new() -> Self {
+        Self {
+            score: 0.5, // Neutral starting trust
+            positive_count: 0,
+            negative_count: 0,
+            last_interaction: Utc::now(),
+        }
+    }
+
+    /// Record a positive interaction
+    pub fn record_positive(&mut self) {
+        self.positive_count += 1;
+        self.last_interaction = Utc::now();
+        // Trust increases with positive interactions, diminishing returns
+        let increase = 0.1 / (1.0 + self.positive_count as f64 * 0.1);
+        self.score = (self.score + increase).min(1.0);
+    }
+
+    /// Record a negative interaction (betrayal)
+    pub fn record_negative(&mut self) {
+        self.negative_count += 1;
+        self.last_interaction = Utc::now();
+        // Trust decreases faster than it increases (negativity bias)
+        let decrease = 0.2 / (1.0 + self.negative_count as f64 * 0.05);
+        self.score = (self.score - decrease).max(0.0);
+    }
+
+    /// Is this entity trusted?
+    pub fn is_trusted(&self) -> bool {
+        self.score > 0.6
+    }
+
+    /// Is this entity distrusted?
+    pub fn is_distrusted(&self) -> bool {
+        self.score < 0.3
+    }
+}
+
+impl Default for TrustLevel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl OxytocinSystem {
+    pub fn new() -> Self {
+        Self {
+            level: ModulatorLevel::new(0.5),
+            trust_map: HashMap::new(),
+            positive_interactions: 0,
+            negative_interactions: 0,
+            cooperativeness: 0.6, // Slightly cooperative by default
+        }
+    }
+
+    /// Record a positive interaction with an entity
+    pub fn record_positive_interaction(&mut self, entity: &str) {
+        self.level.adjust(0.1);
+        self.positive_interactions += 1;
+        self.cooperativeness = (self.cooperativeness + 0.05).min(1.0);
+
+        let trust = self.trust_map.entry(entity.to_string()).or_default();
+        trust.record_positive();
+    }
+
+    /// Record a negative interaction (betrayal, deception)
+    pub fn record_negative_interaction(&mut self, entity: &str) {
+        self.level.adjust(-0.15);
+        self.negative_interactions += 1;
+        self.cooperativeness = (self.cooperativeness - 0.1).max(0.2);
+
+        let trust = self.trust_map.entry(entity.to_string()).or_default();
+        trust.record_negative();
+    }
+
+    /// Get trust level for an entity
+    pub fn get_trust(&self, entity: &str) -> f64 {
+        self.trust_map.get(entity).map(|t| t.score).unwrap_or(0.5) // Neutral trust for unknown entities
+    }
+
+    /// Is an entity trusted?
+    pub fn is_trusted(&self, entity: &str) -> bool {
+        self.get_trust(entity) > 0.6
+    }
+
+    /// Should we prefer cooperative approach?
+    pub fn prefer_cooperation(&self) -> bool {
+        self.cooperativeness > 0.5 && self.level.current() > 0.4
+    }
+
+    /// Get information weight multiplier for a source
+    /// Trusted sources get higher weight
+    pub fn source_weight(&self, source: &str) -> f64 {
+        let trust = self.get_trust(source);
+        0.5 + trust * 0.5 // Range: 0.5-1.0
+    }
+
+    /// Get defensiveness level (inverse of oxytocin)
+    pub fn defensiveness(&self) -> f64 {
+        1.0 - self.level.current()
+    }
+
+    /// Get bonding strength (for multi-agent scenarios)
+    pub fn bonding_strength(&self) -> f64 {
+        self.level.current() * self.cooperativeness
+    }
+
+    /// Should we give benefit of the doubt?
+    pub fn give_benefit_of_doubt(&self) -> bool {
+        self.level.current() > 0.5 && self.cooperativeness > 0.5
+    }
+
+    /// Get cooperativeness level
+    pub fn cooperativeness(&self) -> f64 {
+        self.cooperativeness
+    }
+
+    /// Signal safe context (boosts oxytocin)
+    pub fn signal_safety(&mut self) {
+        self.level.adjust(0.05);
+    }
+
+    /// Signal threat/adversarial context (reduces oxytocin)
+    pub fn signal_adversarial(&mut self) {
+        self.level.adjust(-0.1);
+        self.cooperativeness = (self.cooperativeness - 0.05).max(0.2);
+    }
+
+    /// Cycle update
+    pub fn update(&mut self) {
+        self.level.regulate();
+
+        // Cooperativeness slowly returns to moderate baseline
+        let baseline_coop = 0.6;
+        self.cooperativeness += (baseline_coop - self.cooperativeness) * 0.03;
+
+        // Decay trust slightly over time for inactive relationships
+        let now = Utc::now();
+        let decay_threshold = now - Duration::days(7);
+        for trust in self.trust_map.values_mut() {
+            if trust.last_interaction < decay_threshold {
+                trust.score = (trust.score - 0.01).max(0.3); // Slow decay to neutral-ish
+            }
+        }
+    }
+}
+
+impl Default for OxytocinSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// The complete neuromodulatory system.
 ///
-/// Coordinates all four systems and provides cross-modulation.
+/// Coordinates all seven systems and provides cross-modulation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NeuromodulatorySystem {
     /// Dopamine - reward and motivation
@@ -770,6 +1351,12 @@ pub struct NeuromodulatorySystem {
     pub norepinephrine: NorepinephrineSystem,
     /// Acetylcholine - learning and memory
     pub acetylcholine: AcetylcholineSystem,
+    /// Cortisol - sustained stress and adaptation
+    pub cortisol: CortisolSystem,
+    /// GABA - inhibitory control and deliberation
+    pub gaba: GabaSystem,
+    /// Oxytocin - trust and cooperation
+    pub oxytocin: OxytocinSystem,
     /// Cycle counter
     cycle: u64,
 }
@@ -781,6 +1368,9 @@ impl NeuromodulatorySystem {
             serotonin: SerotoninSystem::new(),
             norepinephrine: NorepinephrineSystem::new(),
             acetylcholine: AcetylcholineSystem::new(),
+            cortisol: CortisolSystem::new(),
+            gaba: GabaSystem::new(),
+            oxytocin: OxytocinSystem::new(),
             cycle: 0,
         }
     }
@@ -843,8 +1433,10 @@ impl NeuromodulatorySystem {
         let ach_factor = self.acetylcholine.learning_multiplier();
         let ne_factor = self.norepinephrine.attention_quality();
         let da_factor = 0.8 + self.dopamine.motivation() * 0.4;
+        // Cortisol impairs learning when chronically elevated
+        let cortisol_factor = self.cortisol.learning_impairment();
 
-        base * ach_factor * ne_factor * da_factor
+        base * ach_factor * ne_factor * da_factor * cortisol_factor
     }
 
     /// Get memory encoding strength
@@ -865,12 +1457,133 @@ impl NeuromodulatorySystem {
     pub fn signal_safety(&mut self) {
         self.norepinephrine.signal_safety();
         self.serotonin.level.adjust(0.1);
+        // Safety also reduces cortisol
+        self.cortisol.level.adjust(-0.05);
+    }
+
+    /// Signal a failure event (build error, test failure, blocked goal)
+    /// Optionally provide an error signature to track repeated same errors
+    pub fn signal_failure(&mut self, error_signature: Option<&str>) {
+        self.cortisol.signal_failure(error_signature);
+
+        // Failures also affect other systems
+        self.serotonin.record_mood(-0.3); // Negative mood
+        self.dopamine.level.adjust(-0.05); // Slight dopamine dip
+
+        // Acute stress response if cortisol getting high
+        if self.cortisol.level.current() > 0.5 {
+            self.norepinephrine.signal_threat(0.2);
+        }
+    }
+
+    /// Signal a success event (build passed, test passed, goal achieved)
+    pub fn signal_success(&mut self) {
+        self.cortisol.signal_success();
+
+        // Success boosts other systems
+        self.serotonin.record_mood(0.5); // Positive mood
+        self.dopamine.level.adjust(0.1); // Dopamine boost
+        self.norepinephrine.signal_safety();
+    }
+
+    /// Get the exploration drive (from cortisol - moderate stress promotes trying new things)
+    pub fn exploration_drive(&self) -> f64 {
+        self.cortisol.exploration_drive()
+    }
+
+    /// Should we try a completely different approach?
+    pub fn should_pivot(&self) -> bool {
+        self.cortisol.should_pivot()
+    }
+
+    /// Should we ask for help?
+    pub fn should_seek_help(&self) -> bool {
+        self.cortisol.should_seek_help()
+    }
+
+    /// Should we take a break to recover?
+    pub fn should_take_break(&self) -> bool {
+        self.cortisol.should_take_break()
+    }
+
+    /// Is the system in burnout state?
+    pub fn is_burned_out(&self) -> bool {
+        self.cortisol.is_burned_out()
+    }
+
+    /// Get current frustration level
+    pub fn frustration(&self) -> f64 {
+        self.cortisol.frustration()
     }
 
     /// Set attention focus
     pub fn focus_on(&mut self, target: String) {
         self.norepinephrine.set_focus(target);
         self.acetylcholine.signal_deep_processing(0.3);
+    }
+
+    // --- GABA (Inhibitory Control) Methods ---
+
+    /// Check if an action should be inhibited for deliberation
+    pub fn check_impulse(&mut self, action: &str, urgency: f64, risk: f64) -> InhibitionResult {
+        self.gaba.check_impulse(action, urgency, risk)
+    }
+
+    /// Continue deliberation on pending action
+    pub fn deliberate(&mut self) -> bool {
+        self.gaba.deliberate()
+    }
+
+    /// Should we pause before a risky action?
+    pub fn should_pause(&self, risk_level: f64) -> bool {
+        self.gaba.should_pause(risk_level)
+    }
+
+    /// Get impulse control quality
+    pub fn impulse_control(&self) -> f64 {
+        self.gaba.impulse_control()
+    }
+
+    /// Signal that deliberation led to good outcome
+    pub fn reward_deliberation(&mut self) {
+        self.gaba.reward_deliberation();
+    }
+
+    /// Signal that impulsive action led to bad outcome
+    pub fn penalize_impulsivity(&mut self) {
+        self.gaba.penalize_impulsivity();
+    }
+
+    // --- Oxytocin (Trust/Cooperation) Methods ---
+
+    /// Record a positive interaction with an entity
+    pub fn record_positive_interaction(&mut self, entity: &str) {
+        self.oxytocin.record_positive_interaction(entity);
+    }
+
+    /// Record a negative interaction (betrayal)
+    pub fn record_negative_interaction(&mut self, entity: &str) {
+        self.oxytocin.record_negative_interaction(entity);
+    }
+
+    /// Get trust level for an entity
+    pub fn get_trust(&self, entity: &str) -> f64 {
+        self.oxytocin.get_trust(entity)
+    }
+
+    /// Is an entity trusted?
+    pub fn is_trusted(&self, entity: &str) -> bool {
+        self.oxytocin.is_trusted(entity)
+    }
+
+    /// Should we prefer cooperative approach?
+    pub fn prefer_cooperation(&self) -> bool {
+        self.oxytocin.prefer_cooperation()
+    }
+
+    /// Get information weight for a source (trusted = higher weight)
+    pub fn source_weight(&self, source: &str) -> f64 {
+        self.oxytocin.source_weight(source)
     }
 
     /// Get current system state summary
@@ -880,12 +1593,24 @@ impl NeuromodulatorySystem {
             serotonin: self.serotonin.level.current(),
             norepinephrine: self.norepinephrine.level.current(),
             acetylcholine: self.acetylcholine.level.current(),
+            cortisol: self.cortisol.level.current(),
+            gaba: self.gaba.level.current(),
+            oxytocin: self.oxytocin.level.current(),
             motivation: self.dopamine.motivation(),
             patience: self.serotonin.patience(),
             stress: self.norepinephrine.stress(),
             learning_depth: self.acetylcholine.depth(),
+            frustration: self.cortisol.frustration(),
+            exploration_drive: self.cortisol.exploration_drive(),
+            impulse_control: self.gaba.impulse_control(),
+            cooperativeness: self.oxytocin.cooperativeness(),
             is_satiated: self.dopamine.is_satiated(),
             is_stressed: self.norepinephrine.is_stressed(),
+            is_burned_out: self.cortisol.is_burned_out(),
+            is_deliberating: self.gaba.is_deliberating(),
+            should_pivot: self.cortisol.should_pivot(),
+            should_seek_help: self.cortisol.should_seek_help(),
+            prefer_cooperation: self.oxytocin.prefer_cooperation(),
             mood_stability: self.serotonin.stability(),
         }
     }
@@ -902,11 +1627,14 @@ impl NeuromodulatorySystem {
         self.serotonin.update();
         self.norepinephrine.update();
         self.acetylcholine.update();
+        self.cortisol.update();
+        self.gaba.update();
+        self.oxytocin.update();
     }
 
     /// Apply cross-system modulation effects
     fn apply_cross_modulation(&mut self) {
-        // High stress reduces serotonin (and thus patience)
+        // High NE stress reduces serotonin (and thus patience)
         if self.norepinephrine.is_stressed() {
             self.serotonin.level.adjust(-0.02);
         }
@@ -924,6 +1652,72 @@ impl NeuromodulatorySystem {
         // Satiated dopamine reduces motivation for more
         if self.dopamine.is_satiated() {
             self.dopamine.level.adjust(-0.03);
+        }
+
+        // --- Cortisol cross-modulation ---
+
+        // High cortisol reduces serotonin (stress reduces patience)
+        if self.cortisol.level.current() > 0.5 {
+            self.serotonin.level.adjust(-0.02);
+        }
+
+        // High cortisol reduces dopamine (chronic stress reduces motivation)
+        if self.cortisol.level.current() > 0.6 {
+            self.dopamine.level.adjust(-0.02);
+        }
+
+        // Burnout impairs acetylcholine (can't learn effectively when burned out)
+        if self.cortisol.is_burned_out() {
+            self.acetylcholine.level.adjust(-0.03);
+        }
+
+        // Success (dopamine boost) helps reduce cortisol
+        if self.dopamine.level.is_elevated() && self.cortisol.level.current() > 0.3 {
+            self.cortisol.level.adjust(-0.01);
+        }
+
+        // --- GABA cross-modulation ---
+
+        // High stress reduces GABA (harder to control impulses when stressed)
+        if self.norepinephrine.is_stressed() {
+            self.gaba.level.adjust(-0.02);
+        }
+
+        // High cortisol also reduces GABA (chronic stress impairs impulse control)
+        if self.cortisol.level.current() > 0.6 {
+            self.gaba.level.adjust(-0.01);
+        }
+
+        // High serotonin enhances GABA (patience improves impulse control)
+        if self.serotonin.level.is_elevated() {
+            self.gaba.level.adjust(0.01);
+        }
+
+        // GABA reduces anxiety from stress (calming effect)
+        if self.gaba.level.is_elevated() && self.norepinephrine.is_stressed() {
+            self.norepinephrine.level.adjust(-0.02);
+        }
+
+        // --- Oxytocin cross-modulation ---
+
+        // High stress reduces oxytocin (harder to trust when stressed)
+        if self.norepinephrine.is_stressed() {
+            self.oxytocin.level.adjust(-0.01);
+        }
+
+        // High cortisol reduces oxytocin (chronic stress impairs social bonding)
+        if self.cortisol.level.current() > 0.5 {
+            self.oxytocin.level.adjust(-0.01);
+        }
+
+        // High oxytocin reduces cortisol (social support helps with stress)
+        if self.oxytocin.level.is_elevated() && self.cortisol.level.current() > 0.3 {
+            self.cortisol.level.adjust(-0.01);
+        }
+
+        // High oxytocin enhances dopamine for social rewards
+        if self.oxytocin.level.is_elevated() {
+            self.dopamine.level.adjust(0.005);
         }
     }
 }
@@ -958,18 +1752,42 @@ pub struct NeuromodulatorState {
     pub norepinephrine: f64,
     /// Current acetylcholine level
     pub acetylcholine: f64,
+    /// Current cortisol level (sustained stress)
+    pub cortisol: f64,
+    /// Current GABA level (inhibitory control)
+    pub gaba: f64,
+    /// Current oxytocin level (trust/cooperation)
+    pub oxytocin: f64,
     /// Derived motivation level
     pub motivation: f64,
     /// Derived patience level
     pub patience: f64,
-    /// Current stress level
+    /// Current stress level (acute, from NE)
     pub stress: f64,
     /// Current learning depth
     pub learning_depth: f64,
+    /// Current frustration level (from cortisol)
+    pub frustration: f64,
+    /// Exploration drive (from moderate cortisol)
+    pub exploration_drive: f64,
+    /// Impulse control quality (from GABA)
+    pub impulse_control: f64,
+    /// Cooperativeness tendency (from oxytocin)
+    pub cooperativeness: f64,
     /// Is reward system satiated?
     pub is_satiated: bool,
-    /// Is system stressed?
+    /// Is system stressed (acute)?
     pub is_stressed: bool,
+    /// Is system burned out (chronic)?
+    pub is_burned_out: bool,
+    /// Is system deliberating on an action? (from GABA)
+    pub is_deliberating: bool,
+    /// Should we try a different approach?
+    pub should_pivot: bool,
+    /// Should we ask for help?
+    pub should_seek_help: bool,
+    /// Prefer cooperative approach? (from oxytocin)
+    pub prefer_cooperation: bool,
     /// Mood stability score
     pub mood_stability: f64,
 }
@@ -1190,5 +2008,152 @@ mod tests {
         let boosted_rate = system.learning_rate();
 
         assert!(boosted_rate > base_rate);
+    }
+
+    #[test]
+    fn test_gaba_impulse_inhibition() {
+        let mut gaba = GabaSystem::new();
+
+        // High GABA should inhibit high-risk actions
+        gaba.level.set(0.8);
+
+        // Low urgency + high risk = inhibited
+        let result = gaba.check_impulse("risky_action", 0.3, 0.9);
+        assert!(matches!(result, InhibitionResult::Inhibited { .. }));
+
+        // High urgency + low risk = proceed
+        let result2 = gaba.check_impulse("safe_action", 0.9, 0.2);
+        assert!(matches!(result2, InhibitionResult::Proceed));
+    }
+
+    #[test]
+    fn test_gaba_deliberation() {
+        let mut gaba = GabaSystem::new();
+        gaba.level.set(0.7);
+
+        // Inhibit an action
+        let _result = gaba.check_impulse("risky_action", 0.3, 0.8);
+        assert!(gaba.is_deliberating());
+
+        // Deliberate multiple cycles - eventually releases
+        for _ in 0..20 {
+            if !gaba.deliberate() {
+                break;
+            }
+        }
+        // After enough cycles, should release
+        assert!(!gaba.is_deliberating());
+    }
+
+    #[test]
+    fn test_gaba_impulsivity_tracking() {
+        let mut gaba = GabaSystem::new();
+
+        // Initially good impulse control
+        let initial_control = gaba.impulse_control();
+
+        // Penalize impulsivity
+        gaba.penalize_impulsivity();
+        gaba.penalize_impulsivity();
+
+        // Impulse control should be worse
+        assert!(gaba.impulse_control() < initial_control);
+
+        // Reward deliberation
+        gaba.reward_deliberation();
+        gaba.reward_deliberation();
+
+        // Should improve
+        assert!(gaba.impulse_control() > gaba.impulsivity_score);
+    }
+
+    #[test]
+    fn test_oxytocin_trust_building() {
+        let mut oxy = OxytocinSystem::new();
+
+        // Unknown entity has neutral trust
+        assert!((oxy.get_trust("user") - 0.5).abs() < 0.01);
+
+        // Positive interactions build trust
+        oxy.record_positive_interaction("user");
+        oxy.record_positive_interaction("user");
+        oxy.record_positive_interaction("user");
+
+        assert!(oxy.get_trust("user") > 0.6);
+        assert!(oxy.is_trusted("user"));
+    }
+
+    #[test]
+    fn test_oxytocin_trust_decay_on_betrayal() {
+        let mut oxy = OxytocinSystem::new();
+
+        // Build up trust first
+        for _ in 0..5 {
+            oxy.record_positive_interaction("friend");
+        }
+        let high_trust = oxy.get_trust("friend");
+
+        // Betrayal reduces trust (and faster than it builds)
+        oxy.record_negative_interaction("friend");
+        oxy.record_negative_interaction("friend");
+
+        assert!(oxy.get_trust("friend") < high_trust);
+    }
+
+    #[test]
+    fn test_oxytocin_cooperation() {
+        let mut oxy = OxytocinSystem::new();
+
+        // Initially slightly cooperative
+        assert!(oxy.prefer_cooperation());
+
+        // Adversarial interactions reduce cooperativeness
+        oxy.signal_adversarial();
+        oxy.signal_adversarial();
+        oxy.signal_adversarial();
+
+        // Cooperativeness should decrease
+        assert!(oxy.cooperativeness() < 0.6);
+    }
+
+    #[test]
+    fn test_oxytocin_source_weighting() {
+        let mut oxy = OxytocinSystem::new();
+
+        // Build trust with one source
+        for _ in 0..5 {
+            oxy.record_positive_interaction("trusted_source");
+        }
+
+        // Trusted source gets higher weight
+        let trusted_weight = oxy.source_weight("trusted_source");
+        let unknown_weight = oxy.source_weight("unknown_source");
+
+        assert!(trusted_weight > unknown_weight);
+    }
+
+    #[test]
+    fn test_gaba_oxytocin_cross_modulation() {
+        let mut system = NeuromodulatorySystem::new();
+
+        // High stress should reduce both GABA and oxytocin
+        let initial_gaba = system.gaba.level.current();
+        let initial_oxy = system.oxytocin.level.current();
+
+        // Create stress
+        system.signal_threat(1.0);
+        system.signal_threat(1.0);
+        system.signal_threat(1.0);
+
+        // Run cross-modulation
+        for _ in 0..5 {
+            system.update();
+        }
+
+        // Both should be affected by stress
+        // GABA reduces under stress (harder to control impulses)
+        assert!(system.gaba.level.current() < initial_gaba + 0.1);
+        // Oxytocin reduces under stress (harder to trust)
+        assert!(system.oxytocin.level.current() < initial_oxy + 0.1);
     }
 }

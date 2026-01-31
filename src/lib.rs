@@ -38,8 +38,9 @@ pub mod signal;
 
 pub use brain::{Brain, BrainConfig, BrainStats, ProcessingResult, SleepReport};
 pub use core::{
-    Broadcast, GlobalWorkspace, NeuromodulatorState, NeuromodulatorySystem, Prediction,
-    PredictionEngine, PredictionError, RewardCategory, RewardQuality,
+    Broadcast, GabaSystem, GlobalWorkspace, InhibitionResult, NeuromodulatorState,
+    NeuromodulatorySystem, OxytocinSystem, Prediction, PredictionEngine, PredictionError,
+    RewardCategory, RewardQuality, TrustLevel,
 };
 pub use error::{BrainError, Result};
 pub use signal::{Arousal, BrainSignal, MemoryTrace, Salience, SignalType, Valence};
@@ -47,8 +48,9 @@ pub use signal::{Arousal, BrainSignal, MemoryTrace, Salience, SignalType, Valenc
 /// Prelude for convenient imports
 pub mod prelude {
     pub use crate::core::{
-        Broadcast, GlobalWorkspace, NeuromodulatorState, NeuromodulatorySystem, Prediction,
-        PredictionEngine, RewardCategory, RewardQuality,
+        Broadcast, GabaSystem, GlobalWorkspace, InhibitionResult, NeuromodulatorState,
+        NeuromodulatorySystem, OxytocinSystem, Prediction, PredictionEngine, RewardCategory,
+        RewardQuality, TrustLevel,
     };
     pub use crate::error::*;
     pub use crate::regions::hippocampus::HippocampusStore;

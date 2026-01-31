@@ -340,6 +340,9 @@ impl Brain {
         // Clear focus during sleep
         self.neuromodulators.norepinephrine.clear_focus();
 
+        // Cortisol restoration during sleep (critical for recovery)
+        self.neuromodulators.cortisol.rest();
+
         Ok(SleepReport {
             hours_slept: hours,
             memories_forgotten: forgotten,
@@ -406,8 +409,129 @@ impl Brain {
         // Also reward patience if we waited for this
         self.neuromodulators.serotonin.reward_patience(0.3);
 
+        // Signal success to cortisol system (reduces stress)
+        self.neuromodulators.signal_success();
+
         // Narrate the achievement
         self.dmn.narrate(description, 0.8);
+    }
+
+    /// Signal a failure event (build error, test failure, etc.)
+    /// Optionally provide an error signature to track repeated same errors.
+    pub fn signal_failure(&mut self, error_description: &str, error_signature: Option<&str>) {
+        self.neuromodulators.signal_failure(error_signature);
+
+        // Process as negative emotional event
+        let signal = BrainSignal::new("failure", SignalType::Error, error_description)
+            .with_valence(-0.5)
+            .with_arousal(0.6);
+        self.dmn.update_emotional_state(signal.valence.value());
+
+        // Narrate the failure
+        self.dmn.narrate(error_description, 0.5);
+    }
+
+    /// Signal a success event (build passed, test passed)
+    pub fn signal_success(&mut self, description: &str) {
+        self.neuromodulators.signal_success();
+
+        // Process as positive emotional event
+        self.dmn.update_emotional_state(0.4);
+        self.dmn.narrate(description, 0.4);
+    }
+
+    /// Check if we should try a different approach (from cortisol)
+    pub fn should_pivot(&self) -> bool {
+        self.neuromodulators.should_pivot()
+    }
+
+    /// Check if we should ask for help
+    pub fn should_seek_help(&self) -> bool {
+        self.neuromodulators.should_seek_help()
+    }
+
+    /// Check if we should take a break
+    pub fn should_take_break(&self) -> bool {
+        self.neuromodulators.should_take_break()
+    }
+
+    /// Get current frustration level
+    pub fn frustration(&self) -> f64 {
+        self.neuromodulators.frustration()
+    }
+
+    /// Get exploration drive (moderate stress promotes trying new things)
+    pub fn exploration_drive(&self) -> f64 {
+        self.neuromodulators.exploration_drive()
+    }
+
+    // --- GABA (Inhibitory Control) Methods ---
+
+    /// Check if an action should be inhibited for deliberation
+    /// Returns InhibitionResult::Proceed or InhibitionResult::Inhibited
+    pub fn check_impulse(
+        &mut self,
+        action: &str,
+        urgency: f64,
+        risk: f64,
+    ) -> crate::core::InhibitionResult {
+        self.neuromodulators.check_impulse(action, urgency, risk)
+    }
+
+    /// Should we pause before a risky action?
+    pub fn should_pause(&self, risk_level: f64) -> bool {
+        self.neuromodulators.should_pause(risk_level)
+    }
+
+    /// Get impulse control quality (0-1)
+    pub fn impulse_control(&self) -> f64 {
+        self.neuromodulators.impulse_control()
+    }
+
+    /// Signal that deliberation led to a good outcome
+    pub fn reward_deliberation(&mut self) {
+        self.neuromodulators.reward_deliberation();
+    }
+
+    /// Signal that an impulsive action led to a bad outcome
+    pub fn penalize_impulsivity(&mut self) {
+        self.neuromodulators.penalize_impulsivity();
+    }
+
+    // --- Oxytocin (Trust/Cooperation) Methods ---
+
+    /// Record a positive interaction with an entity (builds trust)
+    pub fn record_positive_interaction(&mut self, entity: &str) {
+        self.neuromodulators.record_positive_interaction(entity);
+        // Also record in DMN's agent model
+        self.dmn.get_agent_model(entity).record_interaction(true);
+    }
+
+    /// Record a negative interaction (betrayal, reduces trust)
+    pub fn record_negative_interaction(&mut self, entity: &str) {
+        self.neuromodulators.record_negative_interaction(entity);
+        // Also record in DMN's agent model
+        self.dmn.get_agent_model(entity).record_interaction(false);
+    }
+
+    /// Get trust level for an entity (0-1)
+    pub fn get_trust(&self, entity: &str) -> f64 {
+        self.neuromodulators.get_trust(entity)
+    }
+
+    /// Is an entity trusted?
+    pub fn is_trusted(&self, entity: &str) -> bool {
+        self.neuromodulators.is_trusted(entity)
+    }
+
+    /// Should we prefer a cooperative approach?
+    pub fn prefer_cooperation(&self) -> bool {
+        self.neuromodulators.prefer_cooperation()
+    }
+
+    /// Get information weight for a source (trusted = higher weight)
+    pub fn source_weight(&self, source: &str) -> f64 {
+        self.neuromodulators.source_weight(source)
     }
 
     /// Check if the brain advises patience (waiting for better outcome).
@@ -501,12 +625,24 @@ impl Default for BrainStats {
                 serotonin: 0.5,
                 norepinephrine: 0.4,
                 acetylcholine: 0.5,
+                cortisol: 0.2,
+                gaba: 0.5,
+                oxytocin: 0.5,
                 motivation: 0.5,
                 patience: 0.5,
                 stress: 0.0,
                 learning_depth: 0.5,
+                frustration: 0.0,
+                exploration_drive: 0.4,
+                impulse_control: 0.5,
+                cooperativeness: 0.6,
                 is_satiated: false,
                 is_stressed: false,
+                is_burned_out: false,
+                is_deliberating: false,
+                should_pivot: false,
+                should_seek_help: false,
+                prefer_cooperation: true,
                 mood_stability: 0.8,
             },
         }
