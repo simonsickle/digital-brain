@@ -16,6 +16,7 @@ use crate::regions::dmn::{
 };
 use crate::regions::hippocampus::HippocampusStore;
 use crate::regions::prefrontal::{PrefrontalConfig, PrefrontalCortex};
+use crate::regions::schema::{Schema, SchemaCategory, SchemaStats, SchemaStore};
 use crate::regions::thalamus::{Destination, Thalamus};
 use crate::signal::{BrainSignal, MemoryTrace, Salience, SignalType};
 
@@ -82,6 +83,8 @@ pub struct Brain {
     pub neuromodulators: NeuromodulatorySystem,
     /// Nervous system (inter-module signal routing)
     pub nervous_system: NervousSystem,
+    /// Schema store (abstracted patterns from episodes)
+    pub schemas: SchemaStore,
     /// Processing cycle count
     cycle_count: u64,
     /// Configuration
@@ -122,6 +125,7 @@ impl Brain {
             dmn: DefaultModeNetwork::new(),
             neuromodulators: NeuromodulatorySystem::new(),
             nervous_system: NervousSystem::new(),
+            schemas: SchemaStore::new(),
             cycle_count: 0,
             config,
         })
@@ -670,6 +674,61 @@ impl Brain {
             BrainRegion::Workspace,
             gaba_factor,
         );
+    }
+
+    // --- Schema (Pattern Learning) Methods ---
+
+    /// Learn a new pattern from an experience.
+    /// Returns the schema ID.
+    pub fn learn_pattern(
+        &mut self,
+        pattern: &str,
+        category: SchemaCategory,
+        episode_id: Option<u64>,
+        triggers: Vec<&str>,
+    ) -> u64 {
+        if let Some(ep_id) = episode_id {
+            self.schemas
+                .create_from_episode(pattern, category, ep_id, triggers)
+        } else {
+            let id = self.schemas.create(pattern, category);
+            if let Some(schema) = self.schemas.get_mut(id) {
+                for trigger in triggers {
+                    schema.add_trigger(trigger);
+                }
+            }
+            id
+        }
+    }
+
+    /// Find relevant schemas for a situation.
+    pub fn find_schemas(&mut self, query: &str) -> Vec<&Schema> {
+        self.schemas.find(query)
+    }
+
+    /// Add evidence supporting a schema.
+    pub fn support_schema(&mut self, schema_id: u64, episode_id: u64) {
+        self.schemas.add_support(schema_id, episode_id);
+    }
+
+    /// Add evidence contradicting a schema (triggers potential revision).
+    pub fn contradict_schema(&mut self, schema_id: u64, episode_id: u64) {
+        self.schemas.add_contradiction(schema_id, episode_id);
+    }
+
+    /// Get schemas that need revision due to too many contradictions.
+    pub fn schemas_needing_revision(&self) -> Vec<&Schema> {
+        self.schemas.find_needs_revision()
+    }
+
+    /// Get schema statistics.
+    pub fn schema_stats(&self) -> SchemaStats {
+        self.schemas.stats()
+    }
+
+    /// Get high-confidence schemas (well-established patterns).
+    pub fn confident_schemas(&self, min_confidence: f64) -> Vec<&Schema> {
+        self.schemas.find_confident(min_confidence)
     }
 }
 
