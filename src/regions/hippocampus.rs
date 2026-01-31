@@ -378,6 +378,25 @@ impl HippocampusStore {
         })
     }
 
+    /// Get the total count of memories.
+    pub fn count(&self) -> Result<usize> {
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM memories WHERE strength > 0.1",
+            [],
+            |row| row.get(0)
+        )?;
+        Ok(count as usize)
+    }
+
+    /// Check if a memory exists by ID.
+    pub fn exists(&self, memory_id: &str) -> bool {
+        self.conn.query_row(
+            "SELECT 1 FROM memories WHERE id = ?1",
+            params![memory_id],
+            |_| Ok(())
+        ).is_ok()
+    }
+
     /// Get statistics about the memory system.
     pub fn stats(&self) -> Result<MemoryStats> {
         let mut stmt = self.conn.prepare(

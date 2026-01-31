@@ -446,6 +446,16 @@ impl Brain {
         self.hippocampus.most_emotional(limit)
     }
 
+    /// Get total memory count.
+    pub fn memory_count(&self) -> Result<usize> {
+        self.hippocampus.count()
+    }
+
+    /// Check if a specific memory exists.
+    pub fn memory_exists(&self, memory_id: &str) -> bool {
+        self.hippocampus.exists(memory_id)
+    }
+
     /// Ask the brain to reflect on something.
     pub fn reflect(&mut self, topic: &str) -> String {
         self.dmn
