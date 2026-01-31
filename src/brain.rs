@@ -3,6 +3,9 @@
 //! This module wires all brain regions together into a functioning whole.
 //! The Brain struct coordinates processing cycles across all components.
 
+use crate::core::attention::{
+    AttentionBudget, AttentionStats, TaskComplexity, estimate_complexity,
+};
 use crate::core::nervous_system::{BrainRegion, NervousSystem, NervousSystemStats};
 use crate::core::neuromodulators::{
     NeuromodulatorState, NeuromodulatorySystem, RewardCategory, RewardQuality,
@@ -85,6 +88,8 @@ pub struct Brain {
     pub nervous_system: NervousSystem,
     /// Schema store (abstracted patterns from episodes)
     pub schemas: SchemaStore,
+    /// Attention budget (resource allocation)
+    pub attention: AttentionBudget,
     /// Processing cycle count
     cycle_count: u64,
     /// Configuration
@@ -126,6 +131,7 @@ impl Brain {
             neuromodulators: NeuromodulatorySystem::new(),
             nervous_system: NervousSystem::new(),
             schemas: SchemaStore::new(),
+            attention: AttentionBudget::new(100_000), // 100k token budget
             cycle_count: 0,
             config,
         })
@@ -729,6 +735,43 @@ impl Brain {
     /// Get high-confidence schemas (well-established patterns).
     pub fn confident_schemas(&self, min_confidence: f64) -> Vec<&Schema> {
         self.schemas.find_confident(min_confidence)
+    }
+
+    // --- Attention Budget Methods ---
+
+    /// Allocate attention for a task based on estimated complexity.
+    /// Returns the allocated budget (tokens/capacity units).
+    pub fn allocate_attention(&mut self, query: &str) -> usize {
+        let complexity = estimate_complexity(query);
+        self.attention.allocate(complexity)
+    }
+
+    /// Allocate attention with explicit complexity.
+    pub fn allocate_attention_for(&mut self, complexity: TaskComplexity) -> usize {
+        self.attention.allocate(complexity)
+    }
+
+    /// Report actual resource usage after task completion.
+    /// Enables learning to improve future allocations.
+    pub fn report_attention_usage(&mut self, query: &str, used: usize, successful: bool) {
+        let complexity = estimate_complexity(query);
+        self.attention.report_usage(complexity, used, successful);
+    }
+
+    /// Release current attention allocation (task complete).
+    pub fn release_attention(&mut self) {
+        self.attention.release();
+    }
+
+    /// Get attention allocation statistics.
+    pub fn attention_stats(&self) -> AttentionStats {
+        self.attention.stats()
+    }
+
+    /// Get recommended allocation for a query.
+    pub fn recommended_attention(&self, query: &str) -> usize {
+        let complexity = estimate_complexity(query);
+        self.attention.recommended(complexity)
     }
 }
 
