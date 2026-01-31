@@ -54,6 +54,10 @@ path = "examples/memory_demo.rs"
 name = "semantic_search_demo"
 path = "examples/semantic_search_demo.rs"
 
+[[example]]
+name = "brain_repl"
+path = "examples/brain_repl.rs"
+
 [[bench]]
 name = "agent_bench"
 harness = false
