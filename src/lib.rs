@@ -30,12 +30,14 @@
 //! - **Prediction Engine**: Dopamine-like surprise and learning modulation
 //! - **Global Workspace**: Consciousness layer with attention competition
 
+pub mod agent;
 pub mod brain;
 pub mod core;
 pub mod error;
 pub mod regions;
 pub mod signal;
 
+pub use agent::{AgentConfig, AgentCycleResult, AgentLoop, AgentState, Percept, PerceptType};
 pub use brain::{Brain, BrainConfig, BrainStats, ProcessingResult, SleepReport};
 pub use core::{
     BrainRegion, Broadcast, GabaSystem, GlobalWorkspace, InhibitionResult, NervousSystem,

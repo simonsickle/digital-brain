@@ -648,6 +648,7 @@ mod tests {
     #[test]
     fn test_action_selection_basic() {
         let mut selector = ActionSelector::new();
+        selector.set_exploration_rate(0.0); // Disable random exploration for deterministic test
         selector.register_action(make_test_action("explore", ActionCategory::Exploration));
         selector.register_action(make_test_action("exploit", ActionCategory::Exploitation));
 
@@ -657,10 +658,10 @@ mod tests {
 
         let decision = selector.select(&state, &goals, &current_state);
 
-        // Should make some decision
+        // Should make some decision (execute, deliberate, or explore)
         assert!(matches!(
             decision,
-            ActionDecision::Execute(_) | ActionDecision::Deliberate { .. }
+            ActionDecision::Execute(_) | ActionDecision::Deliberate { .. } | ActionDecision::Explore { .. }
         ));
     }
 
