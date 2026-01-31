@@ -426,6 +426,63 @@ impl Brain {
         self.dmn.who_am_i()
     }
 
+    /// Generate a comprehensive introspection report.
+    /// 
+    /// Useful for debugging, analysis, or exporting brain state.
+    pub fn introspect(&self) -> String {
+        let stats = self.stats();
+        let nm = self.neuromodulators.state();
+        
+        let mut report = String::new();
+        
+        report.push_str("╔══════════════════════════════════════════════════════════════╗\n");
+        report.push_str("║                    BRAIN INTROSPECTION                       ║\n");
+        report.push_str("╚══════════════════════════════════════════════════════════════╝\n\n");
+        
+        // Identity
+        report.push_str("── IDENTITY ──────────────────────────────────────────────────\n");
+        report.push_str(&format!("{}\n\n", self.who_am_i()));
+        
+        // Statistics
+        report.push_str("── STATISTICS ────────────────────────────────────────────────\n");
+        report.push_str(&format!("Processing cycles: {}\n", stats.cycles));
+        report.push_str(&format!("Total memories: {}\n", stats.memories));
+        report.push_str(&format!("Working memory items: {}/{}\n", 
+            stats.working_memory_items, 7)); // Miller's law
+        report.push_str(&format!("Beliefs held: {}\n", stats.beliefs));
+        report.push_str(&format!("Learning rate: {:.3}\n\n", stats.learning_rate));
+        
+        // Neuromodulators
+        report.push_str("── NEUROMODULATORS ───────────────────────────────────────────\n");
+        report.push_str(&format!("Dopamine:       {:.2} (reward/motivation)\n", nm.dopamine));
+        report.push_str(&format!("Norepinephrine: {:.2} (arousal/attention)\n", nm.norepinephrine));
+        report.push_str(&format!("Serotonin:      {:.2} (mood/satisfaction)\n", nm.serotonin));
+        report.push_str(&format!("Acetylcholine:  {:.2} (memory encoding)\n\n", nm.acetylcholine));
+        
+        // Current state
+        report.push_str("── CURRENT STATE ─────────────────────────────────────────────\n");
+        report.push_str(&format!("Emotional state: {:.2}\n", stats.emotional_state));
+        report.push_str(&format!("Should pivot: {}\n", self.should_pivot()));
+        report.push_str(&format!("Should seek help: {}\n", self.should_seek_help()));
+        report.push_str(&format!("Should take break: {}\n", self.should_take_break()));
+        report.push_str(&format!("Frustration level: {:.2}\n", self.frustration()));
+        report.push_str(&format!("Exploration drive: {:.2}\n\n", self.exploration_drive()));
+        
+        // Signal processing
+        report.push_str("── SIGNAL PROCESSING ─────────────────────────────────────────\n");
+        report.push_str(&format!("Signals processed: {}\n", stats.signals_processed));
+        report.push_str(&format!("Signals passed: {}\n", stats.signals_passed));
+        report.push_str(&format!("Signals filtered: {}\n", stats.signals_filtered));
+        let pass_rate = if stats.signals_processed > 0 {
+            stats.signals_passed as f64 / stats.signals_processed as f64 * 100.0
+        } else { 0.0 };
+        report.push_str(&format!("Pass rate: {:.1}%\n", pass_rate));
+        
+        report.push_str("\n══════════════════════════════════════════════════════════════\n");
+        
+        report
+    }
+
     /// Add a belief.
     pub fn believe(&mut self, content: &str, category: BeliefCategory, confidence: f64) {
         let belief = Belief::new(content, confidence, category);

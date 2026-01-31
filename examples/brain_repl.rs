@@ -33,6 +33,7 @@ fn print_help() {
   sleep <hours>    Run sleep/consolidation cycle (default: 8)
   stats            Show brain statistics
   who              Ask 'who am I?'
+  introspect       Full brain introspection report
   identity <name>  Set brain identity
   believe <text>   Add a belief about self-capability
   save <path>      Save brain state to directory
@@ -161,6 +162,11 @@ fn main() -> digital_brain::Result<()> {
             "who" => {
                 let identity = brain.who_am_i();
                 println!("🪪 {}", identity);
+            }
+
+            "introspect" | "i" => {
+                let report = brain.introspect();
+                println!("{}", report);
             }
 
             "identity" | "id" => {
