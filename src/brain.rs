@@ -436,6 +436,16 @@ impl Brain {
         self.hippocampus.recent_memories(hours, limit)
     }
 
+    /// Get the strongest (most consolidated) memories.
+    pub fn strongest_memories(&self, limit: usize) -> Result<Vec<MemoryTrace>> {
+        self.hippocampus.strongest_memories(limit)
+    }
+
+    /// Get the most emotional memories.
+    pub fn most_emotional_memories(&self, limit: usize) -> Result<Vec<MemoryTrace>> {
+        self.hippocampus.most_emotional(limit)
+    }
+
     /// Ask the brain to reflect on something.
     pub fn reflect(&mut self, topic: &str) -> String {
         self.dmn

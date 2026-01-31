@@ -437,6 +437,40 @@ impl HippocampusStore {
         Ok(serde_json::to_string_pretty(&memories)?)
     }
 
+    /// Get the strongest (most consolidated) memories.
+    pub fn strongest_memories(&self, limit: usize) -> Result<Vec<MemoryTrace>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT * FROM memories 
+             WHERE strength > 0.1
+             ORDER BY strength DESC, ABS(valence) DESC
+             LIMIT ?1"
+        )?;
+
+        let memories = stmt
+            .query_map(params![limit as i64], |row| self.row_to_memory(row))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(memories)
+    }
+
+    /// Get the most emotional (highest absolute valence) memories.
+    pub fn most_emotional(&self, limit: usize) -> Result<Vec<MemoryTrace>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT * FROM memories 
+             WHERE strength > 0.1
+             ORDER BY ABS(valence) DESC, strength DESC
+             LIMIT ?1"
+        )?;
+
+        let memories = stmt
+            .query_map(params![limit as i64], |row| self.row_to_memory(row))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(memories)
+    }
+
     /// Get memories from the last N hours.
     /// 
     /// Useful for reviewing recent activity.
