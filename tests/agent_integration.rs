@@ -2,9 +2,7 @@
 //!
 //! Tests that verify all the new agent systems work together correctly.
 
-use digital_brain::agent::{
-    AgentConfig, AgentLoop, CommunicationSystem, IntentType, Percept,
-};
+use digital_brain::agent::{AgentConfig, AgentLoop, CommunicationSystem, IntentType, Percept};
 use digital_brain::core::{
     ActionCategory, ActionDecision, ActionTemplate, CuriositySystem, Domain, Entity,
     ExpectedOutcome, Goal, Outcome, Priority, TimeHorizon, WorldModel,
@@ -84,11 +82,13 @@ fn test_agent_goal_tracking() {
 
     // Goal should be active
     assert_eq!(agent.goals().stats().active_goals, 1);
-    assert!(agent
-        .state()
-        .active_goals
-        .iter()
-        .any(|g| g.contains("Test goal")));
+    assert!(
+        agent
+            .state()
+            .active_goals
+            .iter()
+            .any(|g| g.contains("Test goal"))
+    );
 
     // Complete the goal
     agent.complete_goal(goal_id);
@@ -141,7 +141,10 @@ fn test_agent_idle_detection() {
         agent.tick();
     }
 
-    assert!(agent.is_idle(), "Agent should be idle after many cycles with no actions");
+    assert!(
+        agent.is_idle(),
+        "Agent should be idle after many cycles with no actions"
+    );
 
     agent.reset_idle();
     assert!(!agent.is_idle(), "Idle should reset");
@@ -157,11 +160,13 @@ fn test_curiosity_explore_vs_exploit() {
     curiosity.register_domain(Domain::new("testing"), 0.8);
 
     // Low dopamine + high learning = explore
-    let mut explore_state = digital_brain::core::NeuromodulatorState::default();
-    explore_state.dopamine = 0.2;
-    explore_state.motivation = 0.2;
-    explore_state.learning_depth = 0.9;
-    explore_state.exploration_drive = 0.8;
+    let explore_state = digital_brain::core::NeuromodulatorState {
+        dopamine: 0.2,
+        motivation: 0.2,
+        learning_depth: 0.9,
+        exploration_drive: 0.8,
+        ..Default::default()
+    };
 
     let explore_prob = curiosity.explore_vs_exploit(&explore_state);
     assert!(
@@ -170,10 +175,12 @@ fn test_curiosity_explore_vs_exploit() {
     );
 
     // High dopamine + high motivation = exploit
-    let mut exploit_state = digital_brain::core::NeuromodulatorState::default();
-    exploit_state.dopamine = 0.9;
-    exploit_state.motivation = 0.9;
-    exploit_state.learning_depth = 0.2;
+    let exploit_state = digital_brain::core::NeuromodulatorState {
+        dopamine: 0.9,
+        motivation: 0.9,
+        learning_depth: 0.2,
+        ..Default::default()
+    };
 
     let exploit_prob = curiosity.explore_vs_exploit(&exploit_state);
     assert!(
@@ -272,9 +279,11 @@ fn test_communication_style_modulation() {
     let comm = CommunicationSystem::new();
 
     // High stress state
-    let mut state = digital_brain::core::NeuromodulatorState::default();
-    state.stress = 0.9;
-    state.cooperativeness = 0.9;
+    let state = digital_brain::core::NeuromodulatorState {
+        stress: 0.9,
+        cooperativeness: 0.9,
+        ..Default::default()
+    };
 
     let modulated = comm.modulated_style(&state);
 

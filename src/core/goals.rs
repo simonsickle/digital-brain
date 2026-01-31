@@ -13,9 +13,9 @@
 //! - Progress triggers anticipation (dopamine)
 //! - Long-term goals require high patience (serotonin)
 
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::core::neuromodulators::NeuromodulatorState;
@@ -33,7 +33,10 @@ pub enum GoalStatus {
     /// Goal has been achieved
     Completed { completed_at: DateTime<Utc> },
     /// Goal was abandoned
-    Abandoned { reason: String, abandoned_at: DateTime<Utc> },
+    Abandoned {
+        reason: String,
+        abandoned_at: DateTime<Utc>,
+    },
     /// Goal is paused (not actively pursued but not abandoned)
     Paused { reason: String },
 }
@@ -44,27 +47,25 @@ impl GoalStatus {
     }
 
     pub fn is_terminal(&self) -> bool {
-        matches!(self, GoalStatus::Completed { .. } | GoalStatus::Abandoned { .. })
+        matches!(
+            self,
+            GoalStatus::Completed { .. } | GoalStatus::Abandoned { .. }
+        )
     }
 }
 
 /// Priority level for goals
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
 pub enum Priority {
     /// Background/nice-to-have
     Low = 1,
     /// Normal priority
+    #[default]
     Medium = 2,
     /// Important
     High = 3,
     /// Urgent/critical
     Critical = 4,
-}
-
-impl Default for Priority {
-    fn default() -> Self {
-        Priority::Medium
-    }
 }
 
 impl Priority {
@@ -140,22 +141,17 @@ pub struct Goal {
 }
 
 /// Time horizon for goal planning
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum TimeHorizon {
     /// Immediate (< 1 hour)
     Immediate,
     /// Short-term (hours to days)
+    #[default]
     ShortTerm,
     /// Medium-term (weeks)
     MediumTerm,
     /// Long-term (months+)
     LongTerm,
-}
-
-impl Default for TimeHorizon {
-    fn default() -> Self {
-        TimeHorizon::ShortTerm
-    }
 }
 
 impl TimeHorizon {
@@ -316,13 +312,32 @@ pub struct GoalStats {
 /// Event emitted when goal state changes
 #[derive(Debug, Clone)]
 pub enum GoalEvent {
-    Created { goal_id: GoalId },
-    ProgressUpdated { goal_id: GoalId, old_progress: f64, new_progress: f64 },
-    Completed { goal_id: GoalId },
-    Blocked { goal_id: GoalId, reason: String },
-    Unblocked { goal_id: GoalId },
-    Abandoned { goal_id: GoalId, reason: String },
-    DeadlineApproaching { goal_id: GoalId, hours_remaining: f64 },
+    Created {
+        goal_id: GoalId,
+    },
+    ProgressUpdated {
+        goal_id: GoalId,
+        old_progress: f64,
+        new_progress: f64,
+    },
+    Completed {
+        goal_id: GoalId,
+    },
+    Blocked {
+        goal_id: GoalId,
+        reason: String,
+    },
+    Unblocked {
+        goal_id: GoalId,
+    },
+    Abandoned {
+        goal_id: GoalId,
+        reason: String,
+    },
+    DeadlineApproaching {
+        goal_id: GoalId,
+        hours_remaining: f64,
+    },
 }
 
 /// The goal manager
@@ -364,10 +379,7 @@ impl GoalManager {
 
         // Track hierarchy
         if let Some(parent) = goal.parent {
-            self.goal_hierarchy
-                .entry(parent)
-                .or_default()
-                .push(id);
+            self.goal_hierarchy.entry(parent).or_default().push(id);
         }
 
         self.goals.insert(id, goal);
@@ -414,7 +426,9 @@ impl GoalManager {
         candidates.sort_by(|a, b| {
             let score_a = self.score_goal(a, state);
             let score_b = self.score_goal(b, state);
-            score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         candidates.first().copied()
@@ -438,7 +452,8 @@ impl GoalManager {
         let momentum = if goal.progress > 0.7 { 0.15 } else { 0.0 };
 
         // Subgoal bonus (if parent is high priority)
-        let subgoal_bonus = goal.parent
+        let subgoal_bonus = goal
+            .parent
             .and_then(|p| self.goals.get(&p))
             .map(|parent| parent.priority.as_f64() * 0.1)
             .unwrap_or(0.0);
@@ -549,8 +564,7 @@ impl GoalManager {
         // Update completion rate
         let total_terminal = self.stats.completed_goals + self.stats.abandoned_goals;
         if total_terminal > 0 {
-            self.stats.completion_rate =
-                self.stats.completed_goals as f64 / total_terminal as f64;
+            self.stats.completion_rate = self.stats.completed_goals as f64 / total_terminal as f64;
         }
 
         self.emit_event(GoalEvent::Completed { goal_id });
@@ -632,8 +646,7 @@ impl GoalManager {
         // Update completion rate
         let total_terminal = self.stats.completed_goals + self.stats.abandoned_goals;
         if total_terminal > 0 {
-            self.stats.completion_rate =
-                self.stats.completed_goals as f64 / total_terminal as f64;
+            self.stats.completion_rate = self.stats.completed_goals as f64 / total_terminal as f64;
         }
 
         self.emit_event(GoalEvent::Abandoned {
@@ -899,11 +912,7 @@ mod tests {
         let parent = Goal::new("Parent");
         let parent_id = manager.add(parent);
 
-        let subgoals = vec![
-            Goal::new("Sub 1"),
-            Goal::new("Sub 2"),
-            Goal::new("Sub 3"),
-        ];
+        let subgoals = vec![Goal::new("Sub 1"), Goal::new("Sub 2"), Goal::new("Sub 3")];
 
         let ids = manager.decompose(parent_id, subgoals);
         assert_eq!(ids.len(), 3);
@@ -1005,12 +1014,12 @@ mod tests {
     fn test_urgency_increases_near_deadline() {
         // Create goals with different deadlines
         let goal_no_deadline = Goal::new("No deadline");
-        
+
         // Far deadline: created now, deadline in 30 days
         let mut goal_far_deadline = Goal::new("Far deadline");
         goal_far_deadline.deadline = Some(Utc::now() + chrono::Duration::days(30));
         goal_far_deadline.created_at = Utc::now() - chrono::Duration::hours(1); // Created 1 hour ago
-        
+
         // Near deadline: created yesterday, deadline in 2 hours
         let mut goal_near_deadline = Goal::new("Near deadline");
         goal_near_deadline.deadline = Some(Utc::now() + chrono::Duration::hours(2));

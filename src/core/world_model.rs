@@ -11,9 +11,9 @@
 //! - Plan actions based on expected outcomes
 //! - Learn from prediction errors
 
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::signal::Valence;
@@ -326,7 +326,11 @@ impl WorldPrediction {
             }
             _ => {
                 self.correct = Some(self.predicted_value == actual);
-                self.error_magnitude = Some(if self.predicted_value == actual { 0.0 } else { 1.0 });
+                self.error_magnitude = Some(if self.predicted_value == actual {
+                    0.0
+                } else {
+                    1.0
+                });
             }
         }
     }
@@ -445,7 +449,8 @@ impl WorldModel {
     /// Remove an entity
     pub fn remove_entity(&mut self, id: EntityId) -> Option<Entity> {
         // Also remove related relationships
-        self.relationships.retain(|r| r.source != id && r.target != id);
+        self.relationships
+            .retain(|r| r.source != id && r.target != id);
         let entity = self.entities.remove(&id);
         if entity.is_some() {
             self.update_stats();
@@ -529,19 +534,18 @@ impl WorldModel {
             }
 
             // Check if it's time to evaluate
-            if let Some(evaluate_at) = prediction.evaluate_at {
-                if now < evaluate_at {
-                    continue;
-                }
+            if let Some(evaluate_at) = prediction.evaluate_at
+                && now < evaluate_at
+            {
+                continue;
             }
 
             // If prediction is about an entity property, get actual value
-            if let (Some(entity_id), Some(property)) = (prediction.entity_id, &prediction.property) {
-                if let Some(entity) = self.entities.get(&entity_id) {
-                    if let Some(actual) = entity.get_property(property) {
-                        prediction.evaluate(actual.clone());
-                    }
-                }
+            if let (Some(entity_id), Some(property)) = (prediction.entity_id, &prediction.property)
+                && let Some(entity) = self.entities.get(&entity_id)
+                && let Some(actual) = entity.get_property(property)
+            {
+                prediction.evaluate(actual.clone());
             }
         }
 
@@ -705,7 +709,10 @@ mod tests {
         let id = model.add_entity(entity);
 
         let e = model.get_entity(id).unwrap();
-        assert_eq!(e.get_property("price"), Some(&PropertyValue::Number(1200.0)));
+        assert_eq!(
+            e.get_property("price"),
+            Some(&PropertyValue::Number(1200.0))
+        );
         assert_eq!(
             e.get_property("brand"),
             Some(&PropertyValue::String("Apple".to_string()))
@@ -721,7 +728,10 @@ mod tests {
         model.update_entity_property(id, "temperature", 25.0);
 
         let e = model.get_entity(id).unwrap();
-        assert_eq!(e.get_property("temperature"), Some(&PropertyValue::Number(25.0)));
+        assert_eq!(
+            e.get_property("temperature"),
+            Some(&PropertyValue::Number(25.0))
+        );
     }
 
     #[test]
@@ -781,8 +791,7 @@ mod tests {
 
     #[test]
     fn test_prediction_evaluation() {
-        let mut prediction =
-            WorldPrediction::new("Test prediction", PropertyValue::Number(100.0));
+        let mut prediction = WorldPrediction::new("Test prediction", PropertyValue::Number(100.0));
 
         // Correct prediction (within 10%)
         prediction.evaluate(PropertyValue::Number(105.0));

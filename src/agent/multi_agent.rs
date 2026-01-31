@@ -11,9 +11,9 @@
 //! - Collaborative problem solving
 //! - Social dynamics simulation
 
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::signal::Valence;
@@ -146,7 +146,12 @@ pub struct AgentMessage {
 }
 
 impl AgentMessage {
-    pub fn new(from: AgentId, to: Option<AgentId>, message_type: MessageType, content: &str) -> Self {
+    pub fn new(
+        from: AgentId,
+        to: Option<AgentId>,
+        message_type: MessageType,
+        content: &str,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
             from,
@@ -266,7 +271,8 @@ impl AgentModel {
 
     /// Update trust
     pub fn update_trust(&mut self, new_trust: f64) {
-        self.trust_history.push((Utc::now(), new_trust.clamp(0.0, 1.0)));
+        self.trust_history
+            .push((Utc::now(), new_trust.clamp(0.0, 1.0)));
         // Keep last 100 entries
         if self.trust_history.len() > 100 {
             self.trust_history.remove(0);
@@ -275,10 +281,7 @@ impl AgentModel {
 
     /// Get current trust (latest value)
     pub fn current_trust(&self) -> f64 {
-        self.trust_history
-            .last()
-            .map(|(_, t)| *t)
-            .unwrap_or(0.5)
+        self.trust_history.last().map(|(_, t)| *t).unwrap_or(0.5)
     }
 }
 
@@ -347,7 +350,9 @@ impl MultiAgentSystem {
     pub fn register_agent(&mut self, profile: AgentProfile) {
         let id = profile.id;
         self.agents.insert(id, profile);
-        self.agent_models.entry(id).or_insert_with(|| AgentModel::new(id));
+        self.agent_models
+            .entry(id)
+            .or_insert_with(|| AgentModel::new(id));
         self.update_stats();
     }
 

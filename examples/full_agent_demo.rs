@@ -8,12 +8,10 @@
 //! - World Model (entity tracking)
 //! - Communication (structured outputs)
 
-use digital_brain::agent::{
-    AgentConfig, AgentLoop, CommunicationSystem, IntentType, Percept,
-};
+use digital_brain::agent::{AgentConfig, AgentLoop, CommunicationSystem, IntentType, Percept};
 use digital_brain::core::{
-    ActionCategory, ActionTemplate, CuriositySystem, Domain, Entity, ExpectedOutcome,
-    Goal, Outcome, Priority, Relationship, RelationType, TimeHorizon, WorldModel,
+    ActionCategory, ActionTemplate, CuriositySystem, Domain, Entity, ExpectedOutcome, Goal,
+    Outcome, Priority, RelationType, Relationship, TimeHorizon, WorldModel,
 };
 use std::time::Duration;
 use uuid::Uuid;
@@ -116,8 +114,7 @@ fn register_actions(agent: &mut AgentLoop) {
         description: "Write code for the project".to_string(),
         preconditions: vec![],
         expected_outcomes: vec![ExpectedOutcome {
-            outcome: Outcome::success("Code written", 0.7)
-                .with_goal("complete project", 0.1),
+            outcome: Outcome::success("Code written", 0.7).with_goal("complete project", 0.1),
             probability: 0.85,
         }],
         effort_cost: 0.6,
@@ -244,10 +241,7 @@ fn run_agent_loop(
 ) {
     // Simulate some input
     agent.perceive(Percept::text("Start working on the project"));
-    agent.perceive(
-        Percept::feedback("Good progress so far!", 0.6)
-            .with_salience(0.7),
-    );
+    agent.perceive(Percept::feedback("Good progress so far!", 0.6).with_salience(0.7));
 
     println!("  Received 2 percepts");
 
@@ -281,7 +275,10 @@ fn run_agent_loop(
             }
         };
 
-        println!("  Tick {}: {} ({:?})", i, decision_str, result.cycle_duration);
+        println!(
+            "  Tick {}: {} ({:?})",
+            i, decision_str, result.cycle_duration
+        );
 
         // Simulate some learning
         if i % 3 == 0 {

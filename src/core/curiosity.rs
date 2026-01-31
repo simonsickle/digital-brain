@@ -11,13 +11,13 @@
 //! - Low dopamine + high ACh → explore (seek information)
 //! - Curiosity rewards are intrinsic (not tolerance-building)
 
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::core::neuromodulators::NeuromodulatorState;
 use crate::core::action::ActionTemplate;
+use crate::core::neuromodulators::NeuromodulatorState;
 
 /// Domain of knowledge/skill
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -200,7 +200,8 @@ impl CuriositySystem {
 
     /// Register a domain with initial uncertainty
     pub fn register_domain(&mut self, domain: Domain, initial_uncertainty: f64) {
-        self.uncertainty_map.insert(domain.clone(), initial_uncertainty.max(0.0));
+        self.uncertainty_map
+            .insert(domain.clone(), initial_uncertainty.max(0.0));
         self.competence_map.entry(domain).or_default();
     }
 
@@ -218,7 +219,9 @@ impl CuriositySystem {
             successes: 0,
             updated_at: DateTime::<Utc>::MIN_UTC,
         };
-        self.competence_map.get(domain).unwrap_or(&DEFAULT_COMPETENCE)
+        self.competence_map
+            .get(domain)
+            .unwrap_or(&DEFAULT_COMPETENCE)
     }
 
     /// Calculate novelty of a pattern
@@ -242,10 +245,12 @@ impl CuriositySystem {
         // Extract domain from action tags or category
         let domain = Domain::new(&action.category.to_string());
         let uncertainty = self.uncertainty(&domain);
-        
+
         // Higher uncertainty = more potential info gain
         // But also consider expected outcomes
-        let outcome_entropy: f64 = action.expected_outcomes.iter()
+        let outcome_entropy: f64 = action
+            .expected_outcomes
+            .iter()
             .map(|o| {
                 let p = o.probability;
                 if p > 0.0 && p < 1.0 {
@@ -271,10 +276,10 @@ impl CuriositySystem {
         // Modulate by neuromodulator state
         // High ACh (learning depth) boosts curiosity
         let ach_boost = state.learning_depth * 0.3;
-        
+
         // Low dopamine increases exploration drive
         let dopamine_boost = (1.0 - state.dopamine) * 0.2;
-        
+
         // Exploration drive from neuromodulators
         let exploration_boost = state.exploration_drive * 0.2;
 
@@ -284,7 +289,7 @@ impl CuriositySystem {
     /// Get novelty of an action
     fn action_novelty(&self, action: &ActionTemplate) -> f64 {
         // Use action name + description as pattern
-        let pattern = format!("{}:{}", action.name, action.category.to_string());
+        let pattern = format!("{}:{}", action.name, action.category);
         self.novelty(&pattern)
     }
 
@@ -292,20 +297,20 @@ impl CuriositySystem {
     fn competence_progress(&self, action: &ActionTemplate) -> f64 {
         let domain = Domain::new(&action.category.to_string());
         let competence = self.competence(&domain);
-        
+
         // Estimate task difficulty from effort cost
         let difficulty = action.effort_cost;
-        
+
         competence.learning_opportunity(difficulty)
     }
 
     /// Should we explore vs exploit?
     pub fn explore_vs_exploit(&self, state: &NeuromodulatorState) -> f64 {
         // Returns exploration probability (0 = exploit, 1 = explore)
-        
+
         // High dopamine → exploit (seek known rewards)
         let exploit_bias = state.motivation * 0.5 + state.dopamine * 0.3;
-        
+
         // Low dopamine + high ACh → explore (seek information)
         let explore_bias = state.learning_depth * (1.0 - state.dopamine) * 0.4
             + state.exploration_drive * 0.3
@@ -323,7 +328,10 @@ impl CuriositySystem {
     /// Record an exploration event
     pub fn record_exploration(&mut self, event: ExplorationEvent) {
         // Update uncertainty
-        let uncertainty = self.uncertainty_map.entry(event.domain.clone()).or_insert(1.0);
+        let uncertainty = self
+            .uncertainty_map
+            .entry(event.domain.clone())
+            .or_insert(1.0);
         *uncertainty = (*uncertainty - event.info_gain * 0.1).max(0.0);
 
         // Update pattern novelty
@@ -351,7 +359,7 @@ impl CuriositySystem {
             .entry(domain.clone())
             .or_default()
             .update(success, difficulty);
-        
+
         self.update_domain_stats();
     }
 
@@ -377,13 +385,15 @@ impl CuriositySystem {
 
     /// Get domains sorted by learning opportunity
     pub fn domains_by_opportunity(&self) -> Vec<(&Domain, f64)> {
-        let mut domains: Vec<_> = self.uncertainty_map
+        let mut domains: Vec<_> = self
+            .uncertainty_map
             .keys()
             .map(|d| {
                 let uncertainty = self.uncertainty(d);
                 let competence = self.competence(d);
                 // Balance uncertainty with competence for optimal learning zone
-                let opportunity = uncertainty * 0.6 + (1.0 - competence.level) * competence.confidence * 0.4;
+                let opportunity =
+                    uncertainty * 0.6 + (1.0 - competence.level) * competence.confidence * 0.4;
                 (d, opportunity)
             })
             .collect();
@@ -535,12 +545,18 @@ mod tests {
         // After observing, novelty decreases
         curiosity.observe_pattern("new_pattern");
         let after_one = curiosity.novelty("new_pattern");
-        assert!(after_one < 1.0, "Novelty should decrease after first observation");
+        assert!(
+            after_one < 1.0,
+            "Novelty should decrease after first observation"
+        );
 
         // Multiple observations decrease further
         curiosity.observe_pattern("new_pattern");
         let after_two = curiosity.novelty("new_pattern");
-        assert!(after_two < after_one, "Novelty should decrease with more observations");
+        assert!(
+            after_two < after_one,
+            "Novelty should decrease with more observations"
+        );
 
         // Many observations make it very familiar
         for _ in 0..20 {
@@ -548,7 +564,11 @@ mod tests {
         }
         let after_many = curiosity.novelty("new_pattern");
         // With decay rate 0.95, after 22 observations: 0.95^22 ≈ 0.32
-        assert!(after_many < 0.4, "Novelty should be low after many observations: {}", after_many);
+        assert!(
+            after_many < 0.4,
+            "Novelty should be low after many observations: {}",
+            after_many
+        );
     }
 
     #[test]
@@ -562,7 +582,10 @@ mod tests {
         exploit_state.learning_depth = 0.2;
 
         let explore_prob = curiosity.explore_vs_exploit(&exploit_state);
-        assert!(explore_prob < 0.5, "High dopamine should favor exploitation");
+        assert!(
+            explore_prob < 0.5,
+            "High dopamine should favor exploitation"
+        );
 
         // Low dopamine + high ACh → explore
         let mut explore_state = make_test_state();
@@ -572,7 +595,10 @@ mod tests {
         explore_state.exploration_drive = 0.8;
 
         let explore_prob = curiosity.explore_vs_exploit(&explore_state);
-        assert!(explore_prob > 0.5, "Low dopamine + high ACh should favor exploration");
+        assert!(
+            explore_prob > 0.5,
+            "Low dopamine + high ACh should favor exploration"
+        );
     }
 
     #[test]
@@ -646,9 +672,11 @@ mod tests {
 
     #[test]
     fn test_learning_opportunity() {
-        let mut competence = Competence::default();
-        competence.level = 0.5;
-        competence.confidence = 0.8;
+        let competence = Competence {
+            level: 0.5,
+            confidence: 0.8,
+            ..Default::default()
+        };
 
         // Optimal task is slightly above level (0.6)
         let optimal = competence.learning_opportunity(0.6);

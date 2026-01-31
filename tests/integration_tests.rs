@@ -214,9 +214,10 @@ fn test_semantic_search() {
     // Search for "Tesla" - should find 2 memories
     let results = store.retrieve_by_query("Tesla", 5).unwrap();
     assert!(results.len() >= 2, "Should find at least 2 Tesla memories");
-    
+
     // Verify Tesla memories are in results
-    let contents: Vec<String> = results.iter()
+    let contents: Vec<String> = results
+        .iter()
         .map(|m| serde_json::to_string(&m.content).unwrap_or_default())
         .collect();
     assert!(contents.iter().any(|c| c.contains("Tesla")));
@@ -224,7 +225,7 @@ fn test_semantic_search() {
     // Search for "API" - should find multiple memories
     let api_results = store.retrieve_by_query("API bug", 5).unwrap();
     assert!(!api_results.is_empty(), "Should find API-related memories");
-    
+
     // Search with no matches should still return results (falls back to valence)
     let no_match = store.retrieve_by_query("xyznonexistent", 3).unwrap();
     // With no keyword matches, returns top by valence

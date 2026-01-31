@@ -19,14 +19,12 @@
 
 use uuid::Uuid;
 
-use crate::brain::{Brain, BrainConfig, ProcessingResult, SleepReport};
 use crate::agent::{
-    AgentConfig, AgentLoop, CommunicationSystem, IntentType, Percept,
-    MultiAgentSystem, AgentProfile,
+    AgentConfig, AgentLoop, AgentProfile, CommunicationSystem, IntentType, MultiAgentSystem,
+    Percept,
 };
-use crate::core::{
-    ActionTemplate, CuriositySystem, Domain, Goal, GoalId, WorldModel, Entity,
-};
+use crate::brain::{Brain, BrainConfig, ProcessingResult, SleepReport};
+use crate::core::{ActionTemplate, CuriositySystem, Domain, Entity, Goal, GoalId, WorldModel};
 use crate::error::Result;
 
 /// Configuration for the brain-agent
@@ -290,19 +288,16 @@ impl BrainAgent {
         // Check for communication outputs
         if let Some(comm) = &mut self.comm {
             while let Some(intent) = comm.next_to_send() {
-                outputs.push(format!("[{}] {}", format!("{:?}", intent.intent_type), intent.content));
+                outputs.push(format!("[{:?}] {}", intent.intent_type, intent.content));
             }
         }
 
         // Periodic sleep/consolidation
         if self.cycles_since_sleep >= self.config.sleep_interval {
-            match self.brain.sleep(self.config.sleep_duration) {
-                Ok(report) => {
-                    self.stats.total_sleep_cycles += 1;
-                    self.stats.total_memories_consolidated += report.memories_consolidated as u64;
-                    sleep_report = Some(report);
-                }
-                Err(_) => {}
+            if let Ok(report) = self.brain.sleep(self.config.sleep_duration) {
+                self.stats.total_sleep_cycles += 1;
+                self.stats.total_memories_consolidated += report.memories_consolidated as u64;
+                sleep_report = Some(report);
             }
             self.cycles_since_sleep = 0;
         }
@@ -408,9 +403,9 @@ impl Default for BrainAgent {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use super::*;
     use crate::core::{ActionCategory, ExpectedOutcome, Outcome, Priority};
+    use std::time::Duration;
 
     fn make_test_action(name: &str) -> ActionTemplate {
         ActionTemplate {

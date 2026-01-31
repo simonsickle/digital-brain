@@ -18,11 +18,12 @@
 //! - quit            - Exit
 
 use digital_brain::Brain;
-use digital_brain::regions::dmn::{Identity, BeliefCategory};
-use std::io::{self, Write, BufRead};
+use digital_brain::regions::dmn::{BeliefCategory, Identity};
+use std::io::{self, BufRead, Write};
 
 fn print_help() {
-    println!("
+    println!(
+        "
 ╔══════════════════════════════════════════════════════════════╗
 ║                    BRAIN REPL COMMANDS                       ║
 ╚══════════════════════════════════════════════════════════════╝
@@ -44,7 +45,8 @@ fn print_help() {
   clear memories   Clear all memories (with confirmation)
   help             Show this help
   quit             Exit the REPL
-");
+"
+    );
 }
 
 fn main() -> digital_brain::Result<()> {
@@ -82,7 +84,7 @@ fn main() -> digital_brain::Result<()> {
 
         let parts: Vec<&str> = line.splitn(2, ' ').collect();
         let cmd = parts[0].to_lowercase();
-        let arg = parts.get(1).map(|s| *s).unwrap_or("");
+        let arg = parts.get(1).copied().unwrap_or("");
 
         match cmd.as_str() {
             "quit" | "exit" | "q" => {
@@ -124,8 +126,17 @@ fn main() -> digital_brain::Result<()> {
                             for (i, mem) in memories.iter().enumerate() {
                                 let content: String = serde_json::from_value(mem.content.clone())
                                     .unwrap_or_else(|_| "?".to_string());
-                                let preview = if content.len() > 60 { &content[..60] } else { &content };
-                                println!("  {}. {} (v={:+.2})", i + 1, preview, mem.valence.value());
+                                let preview = if content.len() > 60 {
+                                    &content[..60]
+                                } else {
+                                    &content
+                                };
+                                println!(
+                                    "  {}. {} (v={:+.2})",
+                                    i + 1,
+                                    preview,
+                                    mem.valence.value()
+                                );
                             }
                         }
                     }
@@ -144,8 +155,17 @@ fn main() -> digital_brain::Result<()> {
                             for (i, mem) in memories.iter().enumerate() {
                                 let content: String = serde_json::from_value(mem.content.clone())
                                     .unwrap_or_else(|_| "?".to_string());
-                                let preview = if content.len() > 50 { &content[..50] } else { &content };
-                                println!("  {}. {} (v={:+.2})", i + 1, preview, mem.valence.value());
+                                let preview = if content.len() > 50 {
+                                    &content[..50]
+                                } else {
+                                    &content
+                                };
+                                println!(
+                                    "  {}. {} (v={:+.2})",
+                                    i + 1,
+                                    preview,
+                                    mem.valence.value()
+                                );
                             }
                         }
                     }
@@ -154,7 +174,11 @@ fn main() -> digital_brain::Result<()> {
             }
 
             "reflect" => {
-                let topic = if arg.is_empty() { "my current state" } else { arg };
+                let topic = if arg.is_empty() {
+                    "my current state"
+                } else {
+                    arg
+                };
                 let reflection = brain.reflect(topic);
                 println!("💭 {}", reflection);
             }
@@ -180,7 +204,10 @@ fn main() -> digital_brain::Result<()> {
                 println!("   Beliefs: {}", stats.beliefs);
                 println!("   Learning rate: {:.3}", stats.learning_rate);
                 println!("   Dopamine: {:.2}", stats.neuromodulators.dopamine);
-                println!("   Norepinephrine: {:.2}", stats.neuromodulators.norepinephrine);
+                println!(
+                    "   Norepinephrine: {:.2}",
+                    stats.neuromodulators.norepinephrine
+                );
             }
 
             "who" => {
@@ -247,12 +274,10 @@ fn main() -> digital_brain::Result<()> {
                     continue;
                 }
                 match brain.export_memories() {
-                    Ok(json) => {
-                        match std::fs::write(arg, &json) {
-                            Ok(()) => println!("✓ Exported memories to '{}'", arg),
-                            Err(e) => println!("Error writing file: {}", e),
-                        }
-                    }
+                    Ok(json) => match std::fs::write(arg, &json) {
+                        Ok(()) => println!("✓ Exported memories to '{}'", arg),
+                        Err(e) => println!("Error writing file: {}", e),
+                    },
                     Err(e) => println!("Error: {}", e),
                 }
             }
@@ -263,12 +288,10 @@ fn main() -> digital_brain::Result<()> {
                     continue;
                 }
                 match std::fs::read_to_string(arg) {
-                    Ok(json) => {
-                        match brain.import_memories(&json) {
-                            Ok(count) => println!("✓ Imported {} memories from '{}'", count, arg),
-                            Err(e) => println!("Error importing: {}", e),
-                        }
-                    }
+                    Ok(json) => match brain.import_memories(&json) {
+                        Ok(count) => println!("✓ Imported {} memories from '{}'", count, arg),
+                        Err(e) => println!("Error importing: {}", e),
+                    },
                     Err(e) => println!("Error reading file: {}", e),
                 }
             }

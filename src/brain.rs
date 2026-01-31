@@ -407,7 +407,7 @@ impl Brain {
     }
 
     /// Recall memories related to a query.
-    /// 
+    ///
     /// Uses keyword-based semantic search to find relevant memories.
     /// Results are ranked by keyword matches, emotional valence, and memory strength.
     pub fn recall(&mut self, query: &str, limit: usize) -> Result<Vec<MemoryTrace>> {
@@ -425,7 +425,7 @@ impl Brain {
     }
 
     /// Clear all memories.
-    /// 
+    ///
     /// WARNING: Destructive operation. Consider export_memories() first.
     pub fn clear_memories(&self) -> Result<usize> {
         self.hippocampus.clear_all()
@@ -468,8 +468,10 @@ impl Brain {
 
     /// Get a specific memory by ID.
     pub fn get_memory(&self, memory_id: &str) -> Result<MemoryTrace> {
-        self.hippocampus.get(uuid::Uuid::parse_str(memory_id)
-            .map_err(|_| BrainError::MemoryNotFound(memory_id.to_string()))?)
+        self.hippocampus.get(
+            uuid::Uuid::parse_str(memory_id)
+                .map_err(|_| BrainError::MemoryNotFound(memory_id.to_string()))?,
+        )
     }
 
     /// Ask the brain to reflect on something.
@@ -485,47 +487,67 @@ impl Brain {
     }
 
     /// Generate a comprehensive introspection report.
-    /// 
+    ///
     /// Useful for debugging, analysis, or exporting brain state.
     pub fn introspect(&self) -> String {
         let stats = self.stats();
         let nm = self.neuromodulators.state();
-        
+
         let mut report = String::new();
-        
+
         report.push_str("╔══════════════════════════════════════════════════════════════╗\n");
         report.push_str("║                    BRAIN INTROSPECTION                       ║\n");
         report.push_str("╚══════════════════════════════════════════════════════════════╝\n\n");
-        
+
         // Identity
         report.push_str("── IDENTITY ──────────────────────────────────────────────────\n");
         report.push_str(&format!("{}\n\n", self.who_am_i()));
-        
+
         // Statistics
         report.push_str("── STATISTICS ────────────────────────────────────────────────\n");
         report.push_str(&format!("Processing cycles: {}\n", stats.cycles));
         report.push_str(&format!("Total memories: {}\n", stats.memories));
-        report.push_str(&format!("Working memory items: {}/{}\n", 
-            stats.working_memory_items, 7)); // Miller's law
+        report.push_str(&format!(
+            "Working memory items: {}/{}\n",
+            stats.working_memory_items, 7
+        )); // Miller's law
         report.push_str(&format!("Beliefs held: {}\n", stats.beliefs));
         report.push_str(&format!("Learning rate: {:.3}\n\n", stats.learning_rate));
-        
+
         // Neuromodulators
         report.push_str("── NEUROMODULATORS ───────────────────────────────────────────\n");
-        report.push_str(&format!("Dopamine:       {:.2} (reward/motivation)\n", nm.dopamine));
-        report.push_str(&format!("Norepinephrine: {:.2} (arousal/attention)\n", nm.norepinephrine));
-        report.push_str(&format!("Serotonin:      {:.2} (mood/satisfaction)\n", nm.serotonin));
-        report.push_str(&format!("Acetylcholine:  {:.2} (memory encoding)\n\n", nm.acetylcholine));
-        
+        report.push_str(&format!(
+            "Dopamine:       {:.2} (reward/motivation)\n",
+            nm.dopamine
+        ));
+        report.push_str(&format!(
+            "Norepinephrine: {:.2} (arousal/attention)\n",
+            nm.norepinephrine
+        ));
+        report.push_str(&format!(
+            "Serotonin:      {:.2} (mood/satisfaction)\n",
+            nm.serotonin
+        ));
+        report.push_str(&format!(
+            "Acetylcholine:  {:.2} (memory encoding)\n\n",
+            nm.acetylcholine
+        ));
+
         // Current state
         report.push_str("── CURRENT STATE ─────────────────────────────────────────────\n");
         report.push_str(&format!("Emotional state: {:.2}\n", stats.emotional_state));
         report.push_str(&format!("Should pivot: {}\n", self.should_pivot()));
         report.push_str(&format!("Should seek help: {}\n", self.should_seek_help()));
-        report.push_str(&format!("Should take break: {}\n", self.should_take_break()));
+        report.push_str(&format!(
+            "Should take break: {}\n",
+            self.should_take_break()
+        ));
         report.push_str(&format!("Frustration level: {:.2}\n", self.frustration()));
-        report.push_str(&format!("Exploration drive: {:.2}\n\n", self.exploration_drive()));
-        
+        report.push_str(&format!(
+            "Exploration drive: {:.2}\n\n",
+            self.exploration_drive()
+        ));
+
         // Signal processing
         report.push_str("── SIGNAL PROCESSING ─────────────────────────────────────────\n");
         report.push_str(&format!("Signals processed: {}\n", stats.signals_processed));
@@ -533,11 +555,13 @@ impl Brain {
         report.push_str(&format!("Signals filtered: {}\n", stats.signals_filtered));
         let pass_rate = if stats.signals_processed > 0 {
             stats.signals_passed as f64 / stats.signals_processed as f64 * 100.0
-        } else { 0.0 };
+        } else {
+            0.0
+        };
         report.push_str(&format!("Pass rate: {:.1}%\n", pass_rate));
-        
+
         report.push_str("\n══════════════════════════════════════════════════════════════\n");
-        
+
         report
     }
 
@@ -893,12 +917,12 @@ impl Brain {
     // --- Persistence Methods ---
 
     /// Save the brain's state to a directory.
-    /// 
+    ///
     /// Creates or overwrites:
     /// - `brain_meta.json` (cycle count, timestamp)
     /// - `neuromodulators.json` (current neuromodulator levels)
     /// - `who_am_i.txt` (identity description)
-    /// 
+    ///
     /// Note: For full memory persistence, use BrainConfig with memory_path set
     /// to a file path (SQLite database).
     pub fn save_to_dir(&self, dir_path: &str) -> Result<()> {
@@ -930,7 +954,7 @@ impl Brain {
     }
 
     /// Load a brain from a saved directory.
-    /// 
+    ///
     /// If memory_db_path is provided, uses that SQLite DB for memories.
     /// Otherwise creates a new in-memory store.
     pub fn load_from_dir(dir_path: &str, memory_db_path: Option<&str>) -> Result<Self> {
@@ -938,7 +962,7 @@ impl Brain {
         use std::path::Path;
 
         let dir = Path::new(dir_path);
-        
+
         if !dir.exists() {
             return Err(crate::error::BrainError::ConfigError(format!(
                 "Brain save directory does not exist: {}",
@@ -958,7 +982,7 @@ impl Brain {
         if meta_path.exists() {
             let meta_json = fs::read_to_string(&meta_path)?;
             let meta: serde_json::Value = serde_json::from_str(&meta_json)?;
-            
+
             if let Some(cycles) = meta.get("cycle_count").and_then(|v| v.as_u64()) {
                 brain.cycle_count = cycles;
             }
@@ -1191,7 +1215,7 @@ mod tests {
     #[test]
     fn test_save_and_load() {
         use std::fs;
-        
+
         let mut brain = Brain::new().unwrap();
 
         // Set up the brain
@@ -1220,7 +1244,7 @@ mod tests {
 
         // Load from save
         let loaded = Brain::load_from_dir(temp_dir, None).unwrap();
-        
+
         // Verify cycle count was restored
         assert_eq!(loaded.stats().cycles, original_cycles);
 

@@ -181,7 +181,7 @@ impl HippocampusStore {
     }
 
     /// Retrieve memories by semantic query (keyword matching).
-    /// 
+    ///
     /// Searches memory content for query terms. Results are ranked by:
     /// 1. Number of matching keywords
     /// 2. Valence (emotional memories surface first)
@@ -195,29 +195,29 @@ impl HippocampusStore {
             .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
             .filter(|w| !w.is_empty())
             .collect();
-        
+
         if keywords.is_empty() {
             // No valid keywords, fall back to valence-boosted retrieval
             return self.retrieve(limit, true);
         }
-        
+
         // Build SQL LIKE pattern for each keyword
         // We'll fetch more than limit and rank locally
         let fetch_limit = limit * 3;
-        
+
         // First, get all strong memories
         let mut stmt = self.conn.prepare(
             "SELECT * FROM memories 
              WHERE strength > 0.1
              ORDER BY strength DESC
-             LIMIT ?1"
+             LIMIT ?1",
         )?;
-        
+
         let candidates: Vec<MemoryTrace> = stmt
             .query_map(params![fetch_limit as i64], |row| self.row_to_memory(row))?
             .filter_map(|r| r.ok())
             .collect();
-        
+
         // Score each candidate by keyword matches
         let mut scored: Vec<(MemoryTrace, f64)> = candidates
             .into_iter()
@@ -225,36 +225,33 @@ impl HippocampusStore {
                 let content_lower = serde_json::to_string(&mem.content)
                     .unwrap_or_default()
                     .to_lowercase();
-                
+
                 // Count matching keywords
-                let match_count = keywords.iter()
+                let match_count = keywords
+                    .iter()
                     .filter(|kw| content_lower.contains(kw.as_str()))
                     .count();
-                
+
                 // Score = matches + valence boost + strength boost
-                let score = match_count as f64 
-                    + mem.valence.value().abs() * 0.3
-                    + mem.strength * 0.2;
-                
+                let score =
+                    match_count as f64 + mem.valence.value().abs() * 0.3 + mem.strength * 0.2;
+
                 (mem, score)
             })
             .filter(|(_, score)| *score > 0.0) // Only include matches
             .collect();
-        
+
         // Sort by score descending
         scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        
+
         // Take top results and update access
-        let results: Vec<MemoryTrace> = scored
-            .into_iter()
-            .take(limit)
-            .map(|(mem, _)| mem)
-            .collect();
-        
+        let results: Vec<MemoryTrace> =
+            scored.into_iter().take(limit).map(|(mem, _)| mem).collect();
+
         for memory in &results {
             self.update_access(memory)?;
         }
-        
+
         Ok(results)
     }
 
@@ -383,35 +380,40 @@ impl HippocampusStore {
         let count: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM memories WHERE strength > 0.1",
             [],
-            |row| row.get(0)
+            |row| row.get(0),
         )?;
         Ok(count as usize)
     }
 
     /// Check if a memory exists by ID.
     pub fn exists(&self, memory_id: &str) -> bool {
-        self.conn.query_row(
-            "SELECT 1 FROM memories WHERE id = ?1",
-            params![memory_id],
-            |_| Ok(())
-        ).is_ok()
+        self.conn
+            .query_row(
+                "SELECT 1 FROM memories WHERE id = ?1",
+                params![memory_id],
+                |_| Ok(()),
+            )
+            .is_ok()
     }
 
     /// Boost a memory's strength (mark as important).
-    /// 
+    ///
     /// Useful for externally marking memories as significant.
     pub fn boost(&self, memory_id: &str, amount: f64) -> Result<f64> {
-        let current: f64 = self.conn.query_row(
-            "SELECT strength FROM memories WHERE id = ?1",
-            params![memory_id],
-            |row| row.get(0)
-        ).map_err(|_| crate::error::BrainError::MemoryNotFound(memory_id.to_string()))?;
+        let current: f64 = self
+            .conn
+            .query_row(
+                "SELECT strength FROM memories WHERE id = ?1",
+                params![memory_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| crate::error::BrainError::MemoryNotFound(memory_id.to_string()))?;
 
-        let new_strength = (current + amount).min(1.0).max(0.0);
-        
+        let new_strength = (current + amount).clamp(0.0, 1.0);
+
         self.conn.execute(
             "UPDATE memories SET strength = ?1 WHERE id = ?2",
-            params![new_strength, memory_id]
+            params![new_strength, memory_id],
         )?;
 
         Ok(new_strength)
@@ -419,11 +421,11 @@ impl HippocampusStore {
 
     /// Update a memory's valence.
     pub fn set_valence(&self, memory_id: &str, valence: f64) -> Result<()> {
-        let clamped = valence.max(-1.0).min(1.0);
-        
+        let clamped = valence.clamp(-1.0, 1.0);
+
         self.conn.execute(
             "UPDATE memories SET valence = ?1 WHERE id = ?2",
-            params![clamped, memory_id]
+            params![clamped, memory_id],
         )?;
 
         Ok(())
@@ -457,14 +459,14 @@ impl HippocampusStore {
     }
 
     /// Export all memories as JSON.
-    /// 
+    ///
     /// Useful for backup, analysis, or migration.
     pub fn export_json(&self) -> Result<String> {
         let mut stmt = self.conn.prepare(
             "SELECT id, content, valence, salience, surprise, created_at, 
                     last_accessed, access_count, consolidated, strength
              FROM memories
-             ORDER BY created_at DESC"
+             ORDER BY created_at DESC",
         )?;
 
         let memories: Vec<serde_json::Value> = stmt
@@ -494,7 +496,7 @@ impl HippocampusStore {
             "SELECT * FROM memories 
              WHERE strength > 0.1
              ORDER BY strength DESC, ABS(valence) DESC
-             LIMIT ?1"
+             LIMIT ?1",
         )?;
 
         let memories = stmt
@@ -508,22 +510,25 @@ impl HippocampusStore {
     /// Add a tag to a memory.
     pub fn add_tag(&self, memory_id: &str, tag: &str) -> Result<()> {
         // Get current tags
-        let current: String = self.conn.query_row(
-            "SELECT context_tags FROM memories WHERE id = ?1",
-            params![memory_id],
-            |row| row.get(0)
-        ).map_err(|_| crate::error::BrainError::MemoryNotFound(memory_id.to_string()))?;
+        let current: String = self
+            .conn
+            .query_row(
+                "SELECT context_tags FROM memories WHERE id = ?1",
+                params![memory_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| crate::error::BrainError::MemoryNotFound(memory_id.to_string()))?;
 
         let mut tags: Vec<String> = serde_json::from_str(&current).unwrap_or_default();
-        
+
         // Add tag if not present
         if !tags.contains(&tag.to_string()) {
             tags.push(tag.to_string());
             let new_tags = serde_json::to_string(&tags)?;
-            
+
             self.conn.execute(
                 "UPDATE memories SET context_tags = ?1 WHERE id = ?2",
-                params![new_tags, memory_id]
+                params![new_tags, memory_id],
             )?;
         }
 
@@ -532,22 +537,25 @@ impl HippocampusStore {
 
     /// Remove a tag from a memory.
     pub fn remove_tag(&self, memory_id: &str, tag: &str) -> Result<bool> {
-        let current: String = self.conn.query_row(
-            "SELECT context_tags FROM memories WHERE id = ?1",
-            params![memory_id],
-            |row| row.get(0)
-        ).map_err(|_| crate::error::BrainError::MemoryNotFound(memory_id.to_string()))?;
+        let current: String = self
+            .conn
+            .query_row(
+                "SELECT context_tags FROM memories WHERE id = ?1",
+                params![memory_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| crate::error::BrainError::MemoryNotFound(memory_id.to_string()))?;
 
         let mut tags: Vec<String> = serde_json::from_str(&current).unwrap_or_default();
         let original_len = tags.len();
-        
+
         tags.retain(|t| t != tag);
-        
+
         if tags.len() != original_len {
             let new_tags = serde_json::to_string(&tags)?;
             self.conn.execute(
                 "UPDATE memories SET context_tags = ?1 WHERE id = ?2",
-                params![new_tags, memory_id]
+                params![new_tags, memory_id],
             )?;
             Ok(true)
         } else {
@@ -561,7 +569,7 @@ impl HippocampusStore {
             "SELECT * FROM memories 
              WHERE strength > 0.1
              ORDER BY ABS(valence) DESC, strength DESC
-             LIMIT ?1"
+             LIMIT ?1",
         )?;
 
         let memories = stmt
@@ -573,7 +581,7 @@ impl HippocampusStore {
     }
 
     /// Get memories from the last N hours.
-    /// 
+    ///
     /// Useful for reviewing recent activity.
     pub fn recent_memories(&self, hours: f64, limit: usize) -> Result<Vec<MemoryTrace>> {
         let cutoff = chrono::Utc::now() - chrono::Duration::seconds((hours * 3600.0) as i64);
@@ -583,11 +591,13 @@ impl HippocampusStore {
             "SELECT * FROM memories 
              WHERE created_at > ?1
              ORDER BY created_at DESC
-             LIMIT ?2"
+             LIMIT ?2",
         )?;
 
         let memories = stmt
-            .query_map(params![cutoff_str, limit as i64], |row| self.row_to_memory(row))?
+            .query_map(params![cutoff_str, limit as i64], |row| {
+                self.row_to_memory(row)
+            })?
             .filter_map(|r| r.ok())
             .collect();
 
@@ -595,39 +605,46 @@ impl HippocampusStore {
     }
 
     /// Clear all memories.
-    /// 
+    ///
     /// WARNING: This is destructive and cannot be undone.
     /// Use with caution - consider export_json() first for backup.
     pub fn clear_all(&self) -> Result<usize> {
-        let count = self.conn.execute("SELECT COUNT(*) FROM memories", [])
+        let count = self
+            .conn
+            .execute("SELECT COUNT(*) FROM memories", [])
             .and_then(|_| {
                 let mut stmt = self.conn.prepare("SELECT COUNT(*) FROM memories")?;
                 stmt.query_row([], |row| row.get::<_, i64>(0))
             })?;
-        
+
         self.conn.execute("DELETE FROM memories", [])?;
-        
+
         Ok(count as usize)
     }
 
     /// Import memories from JSON.
-    /// 
+    ///
     /// Merges with existing memories (does not clear).
     pub fn import_json(&self, json: &str) -> Result<usize> {
         let memories: Vec<serde_json::Value> = serde_json::from_str(json)?;
         let mut count = 0;
 
         for mem in memories {
-            let content = mem.get("content")
+            let content = mem
+                .get("content")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| crate::error::BrainError::InvalidState("Missing content".into()))?;
-            
+
             let valence = mem.get("valence").and_then(|v| v.as_f64()).unwrap_or(0.0);
             let salience = mem.get("salience").and_then(|v| v.as_f64()).unwrap_or(0.5);
 
-            let signal = crate::signal::BrainSignal::new("import", crate::signal::SignalType::Memory, content)
-                .with_valence(valence)
-                .with_salience(salience);
+            let signal = crate::signal::BrainSignal::new(
+                "import",
+                crate::signal::SignalType::Memory,
+                content,
+            )
+            .with_valence(valence)
+            .with_salience(salience);
 
             self.encode(&signal)?;
             count += 1;

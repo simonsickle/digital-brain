@@ -2,12 +2,12 @@
 //!
 //! Run with: cargo bench
 
-use std::time::{Duration, Instant};
-use digital_brain::agent::{AgentConfig, AgentLoop, BrainAgent, BrainAgentConfig, Percept};
+use digital_brain::agent::{AgentConfig, AgentLoop, BrainAgent, BrainAgentConfig};
 use digital_brain::core::{
-    ActionCategory, ActionTemplate, CuriositySystem, Domain, ExpectedOutcome, Goal, Outcome,
-    Priority, WorldModel, Entity,
+    ActionCategory, ActionTemplate, CuriositySystem, Domain, Entity, ExpectedOutcome, Goal,
+    Outcome, Priority, WorldModel,
 };
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 fn make_action(name: &str, category: ActionCategory) -> ActionTemplate {
@@ -83,7 +83,10 @@ fn main() {
 
     let mut agent = AgentLoop::new(config);
     for i in 0..10 {
-        agent.register_action(make_action(&format!("action{}", i), ActionCategory::Exploitation));
+        agent.register_action(make_action(
+            &format!("action{}", i),
+            ActionCategory::Exploitation,
+        ));
     }
 
     bench("Agent tick (10 actions)", 10_000, || {
@@ -173,16 +176,24 @@ fn main() {
 
     // Encode some memories first for retrieval benchmarks
     for i in 0..100 {
-        let signal = BrainSignal::new("bench", SignalType::Memory, &format!("Memory content {} with Tesla API and various keywords", i))
-            .with_valence(if i % 2 == 0 { 0.5 } else { -0.3 })
-            .with_salience(0.5);
+        let signal = BrainSignal::new(
+            "bench",
+            SignalType::Memory,
+            format!("Memory content {} with Tesla API and various keywords", i),
+        )
+        .with_valence(if i % 2 == 0 { 0.5 } else { -0.3 })
+        .with_salience(0.5);
         hippocampus.encode(&signal).unwrap();
     }
 
     bench("Memory encode", 1_000, || {
-        let signal = BrainSignal::new("bench", SignalType::Memory, "Benchmark memory encoding test")
-            .with_valence(0.5)
-            .with_salience(0.6);
+        let signal = BrainSignal::new(
+            "bench",
+            SignalType::Memory,
+            "Benchmark memory encoding test",
+        )
+        .with_valence(0.5)
+        .with_salience(0.6);
         let _ = hippocampus.encode(&signal);
     });
 

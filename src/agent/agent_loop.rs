@@ -19,10 +19,10 @@
 //! └─────────────────────────────────────────────────────────────┘
 //! ```
 
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 use crate::core::action::{ActionDecision, ActionId, ActionSelector, ActionTemplate, Outcome};
@@ -183,7 +183,7 @@ impl Default for AgentConfig {
 }
 
 /// Current state of the agent
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentState {
     /// Current neuromodulator state
     pub neuromodulators: NeuromodulatorState,
@@ -199,20 +199,6 @@ pub struct AgentState {
     pub total_cycles: u64,
     /// Cycles since last action
     pub idle_cycles: u64,
-}
-
-impl Default for AgentState {
-    fn default() -> Self {
-        Self {
-            neuromodulators: NeuromodulatorState::default(),
-            world_state: HashMap::new(),
-            last_action: None,
-            last_outcome: None,
-            active_goals: Vec::new(),
-            total_cycles: 0,
-            idle_cycles: 0,
-        }
-    }
 }
 
 /// Result of a single agent cycle
@@ -278,6 +264,9 @@ pub struct AgentLoopStats {
     pub goals_abandoned: u64,
 }
 
+/// Action handler function type
+type ActionHandler = Box<dyn Fn(&ActionTemplate) -> Outcome + Send + Sync>;
+
 /// The main agent loop
 pub struct AgentLoop {
     /// Action selector
@@ -297,7 +286,7 @@ pub struct AgentLoop {
     /// Pending action (for multi-step execution)
     _pending_action: Option<ActionId>,
     /// Action execution callbacks
-    action_handlers: HashMap<ActionId, Box<dyn Fn(&ActionTemplate) -> Outcome + Send + Sync>>,
+    action_handlers: HashMap<ActionId, ActionHandler>,
 }
 
 impl AgentLoop {
@@ -349,11 +338,8 @@ impl AgentLoop {
     }
 
     /// Register an action with a handler
-    pub fn register_action_with_handler<F>(
-        &mut self,
-        template: ActionTemplate,
-        handler: F,
-    ) where
+    pub fn register_action_with_handler<F>(&mut self, template: ActionTemplate, handler: F)
+    where
         F: Fn(&ActionTemplate) -> Outcome + Send + Sync + 'static,
     {
         let id = template.id;
@@ -376,7 +362,9 @@ impl AgentLoop {
 
     /// Update world state
     pub fn update_world(&mut self, key: &str, value: &str) {
-        self.state.world_state.insert(key.to_string(), value.to_string());
+        self.state
+            .world_state
+            .insert(key.to_string(), value.to_string());
     }
 
     /// Get world state
@@ -480,8 +468,8 @@ impl AgentLoop {
         }
 
         let cycle_duration = tick_start.elapsed();
-        self.stats.average_cycle_ms = self.stats.average_cycle_ms * 0.99
-            + cycle_duration.as_secs_f64() * 1000.0 * 0.01;
+        self.stats.average_cycle_ms =
+            self.stats.average_cycle_ms * 0.99 + cycle_duration.as_secs_f64() * 1000.0 * 0.01;
 
         AgentCycleResult {
             decision,
@@ -583,7 +571,10 @@ impl AgentLoop {
                 }
                 (None, None)
             }
-            ActionDecision::Deliberate { options, conflict_reason } => {
+            ActionDecision::Deliberate {
+                options,
+                conflict_reason,
+            } => {
                 if self.config.debug {
                     outputs.push(AgentOutput {
                         output_type: OutputType::Status,
@@ -605,7 +596,10 @@ impl AgentLoop {
                     (None, None)
                 }
             }
-            ActionDecision::Explore { domain, curiosity_level } => {
+            ActionDecision::Explore {
+                domain,
+                curiosity_level,
+            } => {
                 if self.config.debug {
                     outputs.push(AgentOutput {
                         output_type: OutputType::Status,
@@ -624,7 +618,7 @@ impl AgentLoop {
                 (None, None)
             }
             ActionDecision::NoAction { reason } => {
-                if self.config.debug && self.state.idle_cycles % 10 == 0 {
+                if self.config.debug && self.state.idle_cycles.is_multiple_of(10) {
                     outputs.push(AgentOutput {
                         output_type: OutputType::Status,
                         content: format!("No action available: {}", reason),
@@ -641,11 +635,11 @@ impl AgentLoop {
     /// Execute an action
     fn execute_action(&mut self, action_id: ActionId) -> Option<Outcome> {
         // Check for registered handler
-        if let Some(handler) = self.action_handlers.get(&action_id) {
-            if let Some(template) = self.action_selector.get_action(action_id) {
-                let template = template.clone();
-                return Some(handler(&template));
-            }
+        if let Some(handler) = self.action_handlers.get(&action_id)
+            && let Some(template) = self.action_selector.get_action(action_id)
+        {
+            let template = template.clone();
+            return Some(handler(&template));
         }
 
         // Default: return expected outcome based on probability
@@ -740,10 +734,8 @@ impl AgentLoop {
         // Update last action value
         if let Some(action_id) = self.state.last_action {
             let outcome_value = if positive { 0.8 } else { -0.3 };
-            self.action_selector.update_from_outcome(
-                action_id,
-                &Outcome::success(message, outcome_value),
-            );
+            self.action_selector
+                .update_from_outcome(action_id, &Outcome::success(message, outcome_value));
         }
     }
 }
@@ -898,8 +890,14 @@ mod tests {
         agent.update_world("location", "home");
         agent.update_world("time", "morning");
 
-        assert_eq!(agent.world_state().get("location"), Some(&"home".to_string()));
-        assert_eq!(agent.world_state().get("time"), Some(&"morning".to_string()));
+        assert_eq!(
+            agent.world_state().get("location"),
+            Some(&"home".to_string())
+        );
+        assert_eq!(
+            agent.world_state().get("time"),
+            Some(&"morning".to_string())
+        );
     }
 
     #[test]

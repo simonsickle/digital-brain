@@ -13,9 +13,9 @@
 //! - High oxytocin → warmer, more cooperative tone
 //! - Low dopamine → less enthusiastic responses
 
-use std::collections::VecDeque;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use uuid::Uuid;
 
 use crate::core::neuromodulators::NeuromodulatorState;
@@ -456,9 +456,8 @@ impl CommunicationSystem {
         let style = self.modulated_style(state);
 
         // Calculate urgency based on state
-        let urgency = intent_type.base_urgency()
-            + state.stress * 0.2
-            + (1.0 - state.patience) * 0.1;
+        let urgency =
+            intent_type.base_urgency() + state.stress * 0.2 + (1.0 - state.patience) * 0.1;
 
         // Calculate valence based on state
         let valence = intent_type.typical_valence()
@@ -521,7 +520,11 @@ impl CommunicationSystem {
         // Update stats
         self.stats.total_messages_sent += 1;
         let intent_name = format!("{:?}", intent.intent_type);
-        *self.stats.messages_by_intent.entry(intent_name).or_insert(0) += 1;
+        *self
+            .stats
+            .messages_by_intent
+            .entry(intent_name)
+            .or_insert(0) += 1;
 
         // Update average message length
         let total = self.stats.total_messages_sent as f64;
@@ -532,8 +535,8 @@ impl CommunicationSystem {
         // Update response time
         if let Some(input_time) = self.last_input_time {
             let response_time = (Utc::now() - input_time).num_milliseconds() as f64;
-            self.stats.average_response_time_ms = self.stats.average_response_time_ms * 0.9
-                + response_time * 0.1;
+            self.stats.average_response_time_ms =
+                self.stats.average_response_time_ms * 0.9 + response_time * 0.1;
         }
 
         Some(intent)
@@ -582,7 +585,7 @@ impl CommunicationSystem {
         &self.stats
     }
 
-    /// Create common intents
+    // Common intent helpers
 
     /// Acknowledge receipt
     pub fn acknowledge(&mut self, content: &str) {
@@ -606,18 +609,12 @@ impl CommunicationSystem {
 
     /// Express emotion/state
     pub fn express(&mut self, content: &str, valence: f64) {
-        self.queue(
-            CommunicationIntent::new(content, IntentType::Express)
-                .with_valence(valence),
-        );
+        self.queue(CommunicationIntent::new(content, IntentType::Express).with_valence(valence));
     }
 
     /// Warn about something
     pub fn warn(&mut self, content: &str) {
-        self.queue(
-            CommunicationIntent::new(content, IntentType::Warn)
-                .with_urgency(0.9),
-        );
+        self.queue(CommunicationIntent::new(content, IntentType::Warn).with_urgency(0.9));
     }
 
     /// Suggest something
@@ -627,18 +624,12 @@ impl CommunicationSystem {
 
     /// Thank
     pub fn thank(&mut self, content: &str) {
-        self.queue(
-            CommunicationIntent::new(content, IntentType::Thank)
-                .with_valence(0.6),
-        );
+        self.queue(CommunicationIntent::new(content, IntentType::Thank).with_valence(0.6));
     }
 
     /// Apologize
     pub fn apologize(&mut self, content: &str) {
-        self.queue(
-            CommunicationIntent::new(content, IntentType::Apologize)
-                .with_valence(-0.1),
-        );
+        self.queue(CommunicationIntent::new(content, IntentType::Apologize).with_valence(-0.1));
     }
 }
 

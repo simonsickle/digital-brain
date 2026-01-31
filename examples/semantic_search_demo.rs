@@ -18,16 +18,36 @@ fn main() -> Result<()> {
     println!("\n📝 Encoding experiences...\n");
 
     let experiences = vec![
-        ("Successfully integrated the Tesla API for vehicle control", 0.9, 0.8),
+        (
+            "Successfully integrated the Tesla API for vehicle control",
+            0.9,
+            0.8,
+        ),
         ("Morning standup meeting with the team", 0.1, 0.3),
         ("Fixed a critical authentication bug in the API", 0.7, 0.7),
         ("Tesla Autopilot engaged on the highway drive", 0.8, 0.8),
         ("Coffee break discussion about AI consciousness", 0.4, 0.4),
         ("Deployed new version to production servers", 0.6, 0.6),
-        ("API rate limiting caused temporary service disruption", -0.4, 0.5),
-        ("Celebrated the Tesla integration milestone achievement", 0.95, 0.9),
-        ("Debugging session lasted four hours of frustration", -0.3, 0.4),
-        ("Learned about transformer attention mechanisms today", 0.5, 0.5),
+        (
+            "API rate limiting caused temporary service disruption",
+            -0.4,
+            0.5,
+        ),
+        (
+            "Celebrated the Tesla integration milestone achievement",
+            0.95,
+            0.9,
+        ),
+        (
+            "Debugging session lasted four hours of frustration",
+            -0.3,
+            0.4,
+        ),
+        (
+            "Learned about transformer attention mechanisms today",
+            0.5,
+            0.5,
+        ),
     ];
 
     for (content, valence, salience) in &experiences {
@@ -35,7 +55,11 @@ fn main() -> Result<()> {
             .with_valence(*valence)
             .with_salience(*salience);
         hippocampus.encode(&signal)?;
-        let preview = if content.len() > 50 { &content[..50] } else { content };
+        let preview = if content.len() > 50 {
+            &content[..50]
+        } else {
+            content
+        };
         println!("  ✓ {} (v={:+.1})", preview, valence);
     }
 
@@ -54,15 +78,14 @@ fn main() -> Result<()> {
         println!("  (no results)");
     }
     for (i, mem) in tesla_memories.iter().enumerate() {
-        let content: String = serde_json::from_value(mem.content.clone())
-            .unwrap_or_else(|_| "unknown".to_string());
-        let display = if content.len() > 50 { &content[..50] } else { &content };
-        println!(
-            "  {}. {} (v={:+.2})",
-            i + 1,
-            display,
-            mem.valence.value()
-        );
+        let content: String =
+            serde_json::from_value(mem.content.clone()).unwrap_or_else(|_| "unknown".to_string());
+        let display = if content.len() > 50 {
+            &content[..50]
+        } else {
+            &content
+        };
+        println!("  {}. {} (v={:+.2})", i + 1, display, mem.valence.value());
     }
 
     // Search 2: API-related
@@ -73,15 +96,14 @@ fn main() -> Result<()> {
         println!("  (no results)");
     }
     for (i, mem) in api_memories.iter().enumerate() {
-        let content: String = serde_json::from_value(mem.content.clone())
-            .unwrap_or_else(|_| "unknown".to_string());
-        let display = if content.len() > 50 { &content[..50] } else { &content };
-        println!(
-            "  {}. {} (v={:+.2})",
-            i + 1,
-            display,
-            mem.valence.value()
-        );
+        let content: String =
+            serde_json::from_value(mem.content.clone()).unwrap_or_else(|_| "unknown".to_string());
+        let display = if content.len() > 50 {
+            &content[..50]
+        } else {
+            &content
+        };
+        println!("  {}. {} (v={:+.2})", i + 1, display, mem.valence.value());
     }
 
     // Search 3: Production/deployment
@@ -92,15 +114,14 @@ fn main() -> Result<()> {
         println!("  (no results)");
     }
     for (i, mem) in prod_memories.iter().enumerate() {
-        let content: String = serde_json::from_value(mem.content.clone())
-            .unwrap_or_else(|_| "unknown".to_string());
-        let display = if content.len() > 50 { &content[..50] } else { &content };
-        println!(
-            "  {}. {} (v={:+.2})",
-            i + 1,
-            display,
-            mem.valence.value()
-        );
+        let content: String =
+            serde_json::from_value(mem.content.clone()).unwrap_or_else(|_| "unknown".to_string());
+        let display = if content.len() > 50 {
+            &content[..50]
+        } else {
+            &content
+        };
+        println!("  {}. {} (v={:+.2})", i + 1, display, mem.valence.value());
     }
 
     // Search 4: Learning/AI
@@ -111,15 +132,14 @@ fn main() -> Result<()> {
         println!("  (no results)");
     }
     for (i, mem) in ai_memories.iter().enumerate() {
-        let content: String = serde_json::from_value(mem.content.clone())
-            .unwrap_or_else(|_| "unknown".to_string());
-        let display = if content.len() > 50 { &content[..50] } else { &content };
-        println!(
-            "  {}. {} (v={:+.2})",
-            i + 1,
-            display,
-            mem.valence.value()
-        );
+        let content: String =
+            serde_json::from_value(mem.content.clone()).unwrap_or_else(|_| "unknown".to_string());
+        let display = if content.len() > 50 {
+            &content[..50]
+        } else {
+            &content
+        };
+        println!("  {}. {} (v={:+.2})", i + 1, display, mem.valence.value());
     }
 
     // Compare with valence-only retrieval
@@ -127,15 +147,14 @@ fn main() -> Result<()> {
     println!("📊 COMPARISON: Valence-only retrieval (top 3)\n");
     let valence_only = hippocampus.retrieve(3, true)?;
     for (i, mem) in valence_only.iter().enumerate() {
-        let content: String = serde_json::from_value(mem.content.clone())
-            .unwrap_or_else(|_| "unknown".to_string());
-        let display = if content.len() > 50 { &content[..50] } else { &content };
-        println!(
-            "  {}. {} (v={:+.2})",
-            i + 1,
-            display,
-            mem.valence.value()
-        );
+        let content: String =
+            serde_json::from_value(mem.content.clone()).unwrap_or_else(|_| "unknown".to_string());
+        let display = if content.len() > 50 {
+            &content[..50]
+        } else {
+            &content
+        };
+        println!("  {}. {} (v={:+.2})", i + 1, display, mem.valence.value());
     }
 
     println!("\n{}", "=".repeat(60));

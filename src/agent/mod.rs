@@ -13,15 +13,12 @@ pub mod brain_agent;
 pub mod communication;
 pub mod multi_agent;
 
-pub use agent_loop::{
-    AgentConfig, AgentCycleResult, AgentLoop, AgentState, Percept, PerceptType,
-};
+pub use agent_loop::{AgentConfig, AgentCycleResult, AgentLoop, AgentState, Percept, PerceptType};
+pub use brain_agent::{BrainAgent, BrainAgentConfig, BrainAgentCycleResult, BrainAgentStats};
 pub use communication::{
     CommunicationIntent, CommunicationStats, CommunicationStyle, CommunicationSystem,
     ConversationMessage, IntentType,
 };
 pub use multi_agent::{
-    AgentId, AgentMessage, AgentModel, AgentProfile, MessageType, MultiAgentStats,
-    MultiAgentSystem,
+    AgentId, AgentMessage, AgentModel, AgentProfile, MessageType, MultiAgentStats, MultiAgentSystem,
 };
-pub use brain_agent::{BrainAgent, BrainAgentConfig, BrainAgentCycleResult, BrainAgentStats};

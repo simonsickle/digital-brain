@@ -9,9 +9,9 @@
 //! - Actor-critic reinforcement learning
 //! - Neuromodulatory influences on decision-making (Doya)
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
 
 use crate::core::neuromodulators::NeuromodulatorState;
 // Note: Valence imported but unused - kept for future expansion
@@ -35,7 +35,10 @@ pub enum Condition {
     /// Neuromodulator threshold
     NeuromodulatorAbove { modulator: String, threshold: f64 },
     /// Custom predicate (for extensibility)
-    Custom { name: String, params: HashMap<String, String> },
+    Custom {
+        name: String,
+        params: HashMap<String, String>,
+    },
 }
 
 /// Expected outcome of an action
@@ -159,9 +162,7 @@ pub enum ActionDecision {
         curiosity_level: f64,
     },
     /// No valid action available
-    NoAction {
-        reason: String,
-    },
+    NoAction { reason: String },
 }
 
 /// Statistics about action selection
@@ -229,14 +230,15 @@ impl ActionSelector {
     /// Register an available action
     pub fn register_action(&mut self, template: ActionTemplate) {
         // Initialize value if not present
-        if !self.action_values.contains_key(&template.id) {
+        if let std::collections::hash_map::Entry::Vacant(e) = self.action_values.entry(template.id)
+        {
             // Initialize based on expected value
             let expected_value: f64 = template
                 .expected_outcomes
                 .iter()
                 .map(|eo| eo.outcome.value * eo.probability)
                 .sum();
-            self.action_values.insert(template.id, expected_value);
+            e.insert(expected_value);
         }
         self.available_actions.push(template);
     }
@@ -316,11 +318,7 @@ impl ActionSelector {
             if score_diff < 0.1 && neuro_state.motivation < 0.7 {
                 self.stats.deliberations += 1;
                 return ActionDecision::Deliberate {
-                    options: scored_actions
-                        .iter()
-                        .take(3)
-                        .map(|(a, _)| a.id)
-                        .collect(),
+                    options: scored_actions.iter().take(3).map(|(a, _)| a.id).collect(),
                     conflict_reason: format!(
                         "Top actions have similar scores ({:.2} vs {:.2})",
                         top_score, second_score
@@ -332,7 +330,11 @@ impl ActionSelector {
         // Execute top action
         if let Some((action, _score)) = scored_actions.first() {
             self.stats.executions += 1;
-            *self.stats.category_counts.entry(action.category).or_insert(0) += 1;
+            *self
+                .stats
+                .category_counts
+                .entry(action.category)
+                .or_insert(0) += 1;
 
             // Record in history
             self.action_history.push(ActionHistoryEntry {
@@ -391,10 +393,12 @@ impl ActionSelector {
     fn goal_alignment(&self, action: &ActionTemplate, active_goals: &[String]) -> f64 {
         let mut bonus = 0.0;
         for outcome in &action.expected_outcomes {
-            if let Some(ref goal) = outcome.outcome.related_goal {
-                if active_goals.iter().any(|g| g.contains(goal) || goal.contains(g)) {
-                    bonus += outcome.probability * outcome.outcome.progress * 0.5;
-                }
+            if let Some(ref goal) = outcome.outcome.related_goal
+                && active_goals
+                    .iter()
+                    .any(|g| g.contains(goal) || goal.contains(g))
+            {
+                bonus += outcome.probability * outcome.outcome.progress * 0.5;
             }
         }
         bonus
@@ -457,10 +461,10 @@ impl ActionSelector {
     fn inhibition_penalty(&self, action_id: ActionId) -> f64 {
         let mut penalty = 0.0;
         for entry in self.action_history.iter().rev().take(5) {
-            if let Some(inhibited) = self.inhibition_map.get(&entry.action_id) {
-                if inhibited.contains(&action_id) {
-                    penalty += 0.2;
-                }
+            if let Some(inhibited) = self.inhibition_map.get(&entry.action_id)
+                && inhibited.contains(&action_id)
+            {
+                penalty += 0.2;
             }
         }
         penalty
@@ -487,7 +491,10 @@ impl ActionSelector {
                 Condition::ResourceAvailable { .. } => true, // Assume available for now
                 Condition::TimeElapsed { .. } => true,       // Assume elapsed for now
                 Condition::GoalActive { .. } => true,        // Assume active for now
-                Condition::NeuromodulatorAbove { modulator, threshold } => {
+                Condition::NeuromodulatorAbove {
+                    modulator,
+                    threshold,
+                } => {
                     let value = match modulator.as_str() {
                         "dopamine" => neuro_state.dopamine,
                         "serotonin" => neuro_state.serotonin,
@@ -661,18 +668,20 @@ mod tests {
         // Should make some decision (execute, deliberate, or explore)
         assert!(matches!(
             decision,
-            ActionDecision::Execute(_) | ActionDecision::Deliberate { .. } | ActionDecision::Explore { .. }
+            ActionDecision::Execute(_)
+                | ActionDecision::Deliberate { .. }
+                | ActionDecision::Explore { .. }
         ));
     }
 
     #[test]
     fn test_high_motivation_prefers_exploitation() {
         let mut selector = ActionSelector::new();
-        
+
         let explore = make_test_action("explore", ActionCategory::Exploration);
         let exploit = make_test_action("exploit", ActionCategory::Exploitation);
         let exploit_id = exploit.id;
-        
+
         selector.register_action(explore);
         selector.register_action(exploit);
         selector.set_exploration_rate(0.0); // Disable random exploration
@@ -692,11 +701,11 @@ mod tests {
     #[test]
     fn test_high_stress_prefers_defensive() {
         let mut selector = ActionSelector::new();
-        
+
         let normal = make_test_action("normal", ActionCategory::Exploitation);
         let defensive = make_test_action("defensive", ActionCategory::Defensive);
         let defensive_id = defensive.id;
-        
+
         selector.register_action(normal);
         selector.register_action(defensive);
         selector.set_exploration_rate(0.0);
@@ -764,7 +773,7 @@ mod tests {
 
         let mut state = make_test_neuro_state();
         state.patience = 0.95; // Very high patience
-        state.stress = 0.1;    // Low stress
+        state.stress = 0.1; // Low stress
         state.motivation = 0.2; // Low motivation
 
         let decision = selector.select(&state, &[], &HashMap::new());
@@ -775,7 +784,7 @@ mod tests {
     #[test]
     fn test_no_valid_actions() {
         let mut selector = ActionSelector::new();
-        
+
         // Action with impossible precondition
         let mut action = make_test_action("impossible", ActionCategory::Exploration);
         action.preconditions = vec![Condition::StateIs {
