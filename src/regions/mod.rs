@@ -1,8 +1,28 @@
 //! Brain regions - specialized processing modules.
+//!
+//! Each region handles a specific aspect of cognition:
+//!
+//! - **hippocampus**: Episodic memory, encoding, retrieval
+//! - **amygdala**: Emotional processing, valence assignment
+//! - **prefrontal**: Working memory, executive control
+//! - **thalamus**: Attention routing, signal gating
+//! - **dmn**: Self-model, identity, default mode processing
+//! - **schema**: Pattern recognition, abstraction
+//! - **basal_ganglia**: Action selection, habit formation
+//! - **acc**: Error detection, conflict monitoring
+//! - **cerebellum**: Procedural memory, timing, motor learning
 
+pub mod acc;
 pub mod amygdala;
+pub mod basal_ganglia;
+pub mod cerebellum;
 pub mod dmn;
 pub mod hippocampus;
 pub mod prefrontal;
 pub mod schema;
 pub mod thalamus;
+
+// Re-export key types
+pub use acc::{ACC, Conflict, ControlSignal, Error, ErrorType};
+pub use basal_ganglia::{ActionPattern, BasalGanglia, GateDecision, SelectionResult};
+pub use cerebellum::{Cerebellum, Procedure, ProcedureStep, TimingPrediction};

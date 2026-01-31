@@ -48,6 +48,9 @@ pub enum BrainRegion {
     DMN,
     Workspace,
     PredictionEngine,
+    BasalGanglia,
+    ACC,
+    Cerebellum,
     External, // Input/output to outside world
 }
 
@@ -61,6 +64,9 @@ impl BrainRegion {
             BrainRegion::DMN => "DMN",
             BrainRegion::Workspace => "Workspace",
             BrainRegion::PredictionEngine => "PredictionEngine",
+            BrainRegion::BasalGanglia => "BasalGanglia",
+            BrainRegion::ACC => "ACC",
+            BrainRegion::Cerebellum => "Cerebellum",
             BrainRegion::External => "External",
         }
     }
