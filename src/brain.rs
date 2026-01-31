@@ -774,6 +774,83 @@ impl Brain {
         let complexity = estimate_complexity(query);
         self.attention.recommended(complexity)
     }
+
+    // --- Persistence Methods ---
+
+    /// Save the brain's state to a directory.
+    /// 
+    /// Creates or overwrites:
+    /// - `brain_meta.json` (cycle count, timestamp)
+    /// - `neuromodulators.json` (current neuromodulator levels)
+    /// - `who_am_i.txt` (identity description)
+    /// 
+    /// Note: For full memory persistence, use BrainConfig with memory_path set
+    /// to a file path (SQLite database).
+    pub fn save_to_dir(&self, dir_path: &str) -> Result<()> {
+        use std::fs;
+        use std::path::Path;
+
+        let dir = Path::new(dir_path);
+        fs::create_dir_all(dir)?;
+
+        // Save neuromodulator state
+        let neuro_state = self.neuromodulators.state();
+        let neuro_path = dir.join("neuromodulators.json");
+        fs::write(&neuro_path, serde_json::to_string_pretty(&neuro_state)?)?;
+
+        // Save brain metadata
+        let meta = serde_json::json!({
+            "cycle_count": self.cycle_count,
+            "saved_at": chrono::Utc::now().to_rfc3339(),
+        });
+        let meta_path = dir.join("brain_meta.json");
+        fs::write(&meta_path, serde_json::to_string_pretty(&meta)?)?;
+
+        // Save identity description
+        let who_am_i = self.who_am_i();
+        let identity_path = dir.join("who_am_i.txt");
+        fs::write(&identity_path, who_am_i)?;
+
+        Ok(())
+    }
+
+    /// Load a brain from a saved directory.
+    /// 
+    /// If memory_db_path is provided, uses that SQLite DB for memories.
+    /// Otherwise creates a new in-memory store.
+    pub fn load_from_dir(dir_path: &str, memory_db_path: Option<&str>) -> Result<Self> {
+        use std::fs;
+        use std::path::Path;
+
+        let dir = Path::new(dir_path);
+        
+        if !dir.exists() {
+            return Err(crate::error::BrainError::ConfigError(format!(
+                "Brain save directory does not exist: {}",
+                dir_path
+            )));
+        }
+
+        // Create brain with memory path if specified
+        let config = BrainConfig {
+            memory_path: memory_db_path.map(String::from),
+            ..Default::default()
+        };
+        let mut brain = Brain::with_config(config)?;
+
+        // Load brain metadata
+        let meta_path = dir.join("brain_meta.json");
+        if meta_path.exists() {
+            let meta_json = fs::read_to_string(&meta_path)?;
+            let meta: serde_json::Value = serde_json::from_str(&meta_json)?;
+            
+            if let Some(cycles) = meta.get("cycle_count").and_then(|v| v.as_u64()) {
+                brain.cycle_count = cycles;
+            }
+        }
+
+        Ok(brain)
+    }
 }
 
 impl Default for Brain {
@@ -994,5 +1071,45 @@ mod tests {
         // Verify identity was set
         let who = brain.who_am_i();
         assert!(who.contains("Rata"));
+    }
+
+    #[test]
+    fn test_save_and_load() {
+        use std::fs;
+        
+        let mut brain = Brain::new().unwrap();
+
+        // Set up the brain
+        let identity = Identity {
+            name: "SaveTestBrain".to_string(),
+            core_values: vec!["persistence".to_string()],
+            self_description: "A brain that saves itself".to_string(),
+            creation_time: chrono::Utc::now(),
+        };
+        brain.set_identity(identity);
+
+        // Process some things to increment cycle count
+        brain.process("Memory one").unwrap();
+        brain.process("Memory two").unwrap();
+
+        let original_cycles = brain.stats().cycles;
+
+        // Save to temp directory
+        let temp_dir = "/tmp/brain_save_test";
+        brain.save_to_dir(temp_dir).unwrap();
+
+        // Verify files exist
+        assert!(std::path::Path::new(&format!("{}/brain_meta.json", temp_dir)).exists());
+        assert!(std::path::Path::new(&format!("{}/neuromodulators.json", temp_dir)).exists());
+        assert!(std::path::Path::new(&format!("{}/who_am_i.txt", temp_dir)).exists());
+
+        // Load from save
+        let loaded = Brain::load_from_dir(temp_dir, None).unwrap();
+        
+        // Verify cycle count was restored
+        assert_eq!(loaded.stats().cycles, original_cycles);
+
+        // Cleanup
+        fs::remove_dir_all(temp_dir).ok();
     }
 }

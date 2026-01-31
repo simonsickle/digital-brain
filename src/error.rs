@@ -39,4 +39,8 @@ pub enum BrainError {
     /// IO error
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    /// Configuration error
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
 }
