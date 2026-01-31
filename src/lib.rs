@@ -38,9 +38,10 @@ pub mod signal;
 
 pub use brain::{Brain, BrainConfig, BrainStats, ProcessingResult, SleepReport};
 pub use core::{
-    Broadcast, GabaSystem, GlobalWorkspace, InhibitionResult, NeuromodulatorState,
-    NeuromodulatorySystem, OxytocinSystem, Prediction, PredictionEngine, PredictionError,
-    RewardCategory, RewardQuality, TrustLevel,
+    BrainRegion, Broadcast, GabaSystem, GlobalWorkspace, InhibitionResult, NervousSystem,
+    NervousSystemConfig, NervousSystemStats, NeuromodulatorState, NeuromodulatorySystem,
+    OxytocinSystem, Pathway, Prediction, PredictionEngine, PredictionError, RewardCategory,
+    RewardQuality, SignalTrace, TrustLevel,
 };
 pub use error::{BrainError, Result};
 pub use signal::{Arousal, BrainSignal, MemoryTrace, Salience, SignalType, Valence};
