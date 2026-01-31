@@ -13,7 +13,10 @@ use crate::core::neuromodulators::{
 use crate::core::prediction::{Prediction, PredictionEngine, PredictionError};
 use crate::core::workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
 use crate::error::{BrainError, Result};
+use crate::regions::acc::{ACC, ControlSignal};
 use crate::regions::amygdala::{Amygdala, EmotionalAppraisal};
+use crate::regions::basal_ganglia::{ActionPattern, BasalGanglia, GateDecision};
+use crate::regions::cerebellum::{Cerebellum, Procedure};
 use crate::regions::dmn::{
     Belief, BeliefCategory, DefaultModeNetwork, Identity, ReflectionTrigger,
 };
@@ -90,6 +93,12 @@ pub struct Brain {
     pub schemas: SchemaStore,
     /// Attention budget (resource allocation)
     pub attention: AttentionBudget,
+    /// Action selection and habit formation
+    pub basal_ganglia: BasalGanglia,
+    /// Error detection and conflict monitoring
+    pub acc: ACC,
+    /// Procedural memory and timing
+    pub cerebellum: Cerebellum,
     /// Processing cycle count
     cycle_count: u64,
     /// Configuration
@@ -132,6 +141,9 @@ impl Brain {
             nervous_system: NervousSystem::new(),
             schemas: SchemaStore::new(),
             attention: AttentionBudget::new(100_000), // 100k token budget
+            basal_ganglia: BasalGanglia::new(),
+            acc: ACC::new(),
+            cerebellum: Cerebellum::new(),
             cycle_count: 0,
             config,
         })
@@ -912,6 +924,164 @@ impl Brain {
     pub fn recommended_attention(&self, query: &str) -> usize {
         let complexity = estimate_complexity(query);
         self.attention.recommended(complexity)
+    }
+
+    // --- Basal Ganglia (Action Selection) ---
+
+    /// Register an action pattern that can be selected
+    pub fn register_action(&mut self, action: ActionPattern) {
+        self.basal_ganglia.register_action(action);
+    }
+
+    /// Select an action based on current context
+    pub fn select_action(&mut self, context: &str) -> Option<uuid::Uuid> {
+        let result = self.basal_ganglia.select(context);
+
+        // If there's conflict, register it with ACC
+        if result.decision == GateDecision::Deliberate {
+            self.acc.detect_conflict(
+                result.suppressed.iter().map(|id| id.to_string()).collect(),
+                vec![0.5; result.suppressed.len()], // Approximate strengths
+            );
+        }
+
+        // Sync dopamine from neuromodulators
+        self.basal_ganglia
+            .set_dopamine(self.neuromodulators.state().dopamine);
+
+        result.selected
+    }
+
+    /// Provide reward for the last selected action
+    pub fn reward_action(&mut self, amount: f64) {
+        if let Some(prediction_error) = self.basal_ganglia.reward(amount) {
+            // Large prediction errors should register with ACC
+            if prediction_error.abs() > 0.5 {
+                self.acc.prediction_error(
+                    "expected reward",
+                    &format!("got {:.2}", amount),
+                    prediction_error.abs(),
+                );
+            }
+
+            // Also inform neuromodulator system
+            if amount > 0.0 {
+                let quality = RewardQuality {
+                    depth: 0.5,
+                    goal_alignment: 0.5,
+                    novelty: 0.3,
+                    durability: 0.5,
+                    intrinsic: 0.5,
+                };
+                self.neuromodulators
+                    .process_reward(amount, RewardCategory::Achievement, quality);
+            }
+        }
+    }
+
+    /// Get all habits (automatic actions)
+    pub fn habits(&self) -> Vec<&ActionPattern> {
+        self.basal_ganglia.habits()
+    }
+
+    // --- ACC (Error and Conflict Monitoring) ---
+
+    /// Report an error to the ACC
+    pub fn report_error(&mut self, action: &str, consequence: &str, severity: f64) {
+        self.acc.action_error(action, consequence, severity);
+    }
+
+    /// Report a goal failure to the ACC
+    pub fn report_goal_failure(&mut self, goal: &str, reason: &str, severity: f64) {
+        self.acc.goal_failure(goal, reason, severity);
+    }
+
+    /// Get current cognitive load
+    pub fn cognitive_load(&self) -> f64 {
+        self.acc.cognitive_load()
+    }
+
+    /// Check if more cognitive control is needed
+    pub fn needs_more_control(&self) -> bool {
+        self.acc.needs_control()
+    }
+
+    /// Get effort recommendation for current state
+    pub fn effort_recommendation(&self) -> f64 {
+        self.acc.effort_recommendation()
+    }
+
+    /// Process any pending control signals from ACC
+    pub fn process_control_signals(&mut self) {
+        while let Some(signal) = self.acc.next_control_signal() {
+            match signal {
+                ControlSignal::IncreaseAttention { target, amount } => {
+                    // Could boost attention for this target
+                    if self.config.verbose {
+                        println!("ACC: Increase attention to '{}' by {:.2}", target, amount);
+                    }
+                }
+                ControlSignal::SlowDown { reason } => {
+                    // Could increase deliberation
+                    if self.config.verbose {
+                        println!("ACC: Slow down - {}", reason);
+                    }
+                }
+                ControlSignal::Alert { message, urgency } => {
+                    // High urgency alerts
+                    if urgency > 0.8 {
+                        println!("⚠️ ACC ALERT: {}", message);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // --- Cerebellum (Procedural Memory) ---
+
+    /// Learn a new procedure/skill
+    pub fn learn_procedure(&mut self, procedure: Procedure) -> uuid::Uuid {
+        self.cerebellum.learn(procedure)
+    }
+
+    /// Practice a procedure
+    pub fn practice_procedure(&mut self, id: uuid::Uuid, success: bool, execution_time: f64) {
+        self.cerebellum.practice(id, success, execution_time);
+
+        // If practice failed, register with ACC
+        if !success
+            && let Some(proc) = self.cerebellum.get(id)
+        {
+            self.acc
+                .action_error(&proc.name, "procedure execution failed", 0.3);
+        }
+    }
+
+    /// Check if a procedure is automatic (well-learned)
+    pub fn is_procedure_automatic(&self, id: uuid::Uuid) -> bool {
+        self.cerebellum.is_automatic(id)
+    }
+
+    /// Get all automatic procedures
+    pub fn automatic_procedures(&self) -> Vec<&Procedure> {
+        self.cerebellum.automatic_procedures()
+    }
+
+    /// Make a timing prediction
+    pub fn predict_timing(
+        &mut self,
+        event: &str,
+        duration_ms: i64,
+    ) -> chrono::DateTime<chrono::Utc> {
+        self.cerebellum
+            .predict_timing(event, duration_ms)
+            .predicted_time
+    }
+
+    /// Record actual timing (for learning)
+    pub fn record_timing(&mut self, event: &str) {
+        self.cerebellum.record_timing(event, chrono::Utc::now());
     }
 
     // --- Persistence Methods ---
