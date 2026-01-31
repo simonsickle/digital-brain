@@ -1,5 +1,6 @@
 //! Core systems - cross-cutting functionality.
 
+pub mod action;
 pub mod attention;
 pub mod nervous_system;
 pub mod neuromodulators;
@@ -20,3 +21,7 @@ pub use neuromodulators::{
 };
 pub use prediction::{Prediction, PredictionEngine, PredictionError, PredictionStats};
 pub use workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
+pub use action::{
+    ActionCategory, ActionDecision, ActionId, ActionSelector, ActionStats, ActionTemplate,
+    Condition, ExpectedOutcome, Outcome,
+};
