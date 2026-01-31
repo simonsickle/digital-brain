@@ -407,10 +407,11 @@ impl Brain {
     }
 
     /// Recall memories related to a query.
-    pub fn recall(&mut self, _query: &str, limit: usize) -> Result<Vec<MemoryTrace>> {
-        // For now, just retrieve by valence boost
-        // TODO: Implement semantic search
-        self.hippocampus.retrieve(limit, true)
+    /// 
+    /// Uses keyword-based semantic search to find relevant memories.
+    /// Results are ranked by keyword matches, emotional valence, and memory strength.
+    pub fn recall(&mut self, query: &str, limit: usize) -> Result<Vec<MemoryTrace>> {
+        self.hippocampus.retrieve_by_query(query, limit)
     }
 
     /// Ask the brain to reflect on something.

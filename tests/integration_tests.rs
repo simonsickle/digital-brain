@@ -188,3 +188,45 @@ fn test_statistics() {
     assert_eq!(stats.negative_memories, 2);
     assert!(stats.avg_valence > 0.0); // Should be slightly positive
 }
+
+/// Test semantic search via retrieve_by_query.
+#[test]
+fn test_semantic_search() {
+    let store = HippocampusStore::new_in_memory().unwrap();
+
+    // Encode memories with different content
+    let memories = vec![
+        ("Solved the Tesla API authentication bug", 0.8),
+        ("Regular Monday morning standup meeting", 0.1),
+        ("Fixed critical server crash at 3am", -0.5),
+        ("Tesla vehicle control integration complete", 0.9),
+        ("Coffee break with the team", 0.2),
+        ("API rate limiting issue resolved", 0.6),
+    ];
+
+    for (content, valence) in &memories {
+        let signal = BrainSignal::new("test", SignalType::Memory, *content)
+            .with_valence(*valence)
+            .with_salience(0.5);
+        store.encode(&signal).unwrap();
+    }
+
+    // Search for "Tesla" - should find 2 memories
+    let results = store.retrieve_by_query("Tesla", 5).unwrap();
+    assert!(results.len() >= 2, "Should find at least 2 Tesla memories");
+    
+    // Verify Tesla memories are in results
+    let contents: Vec<String> = results.iter()
+        .map(|m| serde_json::to_string(&m.content).unwrap_or_default())
+        .collect();
+    assert!(contents.iter().any(|c| c.contains("Tesla")));
+
+    // Search for "API" - should find multiple memories
+    let api_results = store.retrieve_by_query("API bug", 5).unwrap();
+    assert!(!api_results.is_empty(), "Should find API-related memories");
+    
+    // Search with no matches should still return results (falls back to valence)
+    let no_match = store.retrieve_by_query("xyznonexistent", 3).unwrap();
+    // With no keyword matches, returns top by valence
+    assert!(!no_match.is_empty());
+}

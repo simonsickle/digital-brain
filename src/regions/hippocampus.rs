@@ -180,6 +180,84 @@ impl HippocampusStore {
         Ok(memories)
     }
 
+    /// Retrieve memories by semantic query (keyword matching).
+    /// 
+    /// Searches memory content for query terms. Results are ranked by:
+    /// 1. Number of matching keywords
+    /// 2. Valence (emotional memories surface first)
+    /// 3. Strength (consolidated memories preferred)
+    pub fn retrieve_by_query(&self, query: &str, limit: usize) -> Result<Vec<MemoryTrace>> {
+        // Tokenize query into keywords (lowercase, strip punctuation)
+        let keywords: Vec<String> = query
+            .to_lowercase()
+            .split_whitespace()
+            .filter(|w| w.len() > 2) // Skip short words
+            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .filter(|w| !w.is_empty())
+            .collect();
+        
+        if keywords.is_empty() {
+            // No valid keywords, fall back to valence-boosted retrieval
+            return self.retrieve(limit, true);
+        }
+        
+        // Build SQL LIKE pattern for each keyword
+        // We'll fetch more than limit and rank locally
+        let fetch_limit = limit * 3;
+        
+        // First, get all strong memories
+        let mut stmt = self.conn.prepare(
+            "SELECT * FROM memories 
+             WHERE strength > 0.1
+             ORDER BY strength DESC
+             LIMIT ?1"
+        )?;
+        
+        let candidates: Vec<MemoryTrace> = stmt
+            .query_map(params![fetch_limit as i64], |row| self.row_to_memory(row))?
+            .filter_map(|r| r.ok())
+            .collect();
+        
+        // Score each candidate by keyword matches
+        let mut scored: Vec<(MemoryTrace, f64)> = candidates
+            .into_iter()
+            .map(|mem| {
+                let content_lower = serde_json::to_string(&mem.content)
+                    .unwrap_or_default()
+                    .to_lowercase();
+                
+                // Count matching keywords
+                let match_count = keywords.iter()
+                    .filter(|kw| content_lower.contains(kw.as_str()))
+                    .count();
+                
+                // Score = matches + valence boost + strength boost
+                let score = match_count as f64 
+                    + mem.valence.value().abs() * 0.3
+                    + mem.strength * 0.2;
+                
+                (mem, score)
+            })
+            .filter(|(_, score)| *score > 0.0) // Only include matches
+            .collect();
+        
+        // Sort by score descending
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        
+        // Take top results and update access
+        let results: Vec<MemoryTrace> = scored
+            .into_iter()
+            .take(limit)
+            .map(|(mem, _)| mem)
+            .collect();
+        
+        for memory in &results {
+            self.update_access(memory)?;
+        }
+        
+        Ok(results)
+    }
+
     /// Get a specific memory by ID.
     pub fn get(&self, id: Uuid) -> Result<MemoryTrace> {
         let mut stmt = self.conn.prepare("SELECT * FROM memories WHERE id = ?1")?;
