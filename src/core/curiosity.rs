@@ -125,7 +125,7 @@ impl Competence {
         }
 
         // Update level based on success rate and difficulty
-        let success_rate = self.successes as f64 / self.attempts as f64;
+        let _success_rate = self.successes as f64 / self.attempts as f64;
         let weighted_success = if success {
             difficulty * 0.1
         } else {

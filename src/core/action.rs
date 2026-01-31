@@ -201,7 +201,7 @@ pub struct ActionSelector {
 #[derive(Debug, Clone)]
 struct ActionHistoryEntry {
     action_id: ActionId,
-    timestamp: std::time::Instant,
+    _timestamp: std::time::Instant,
     outcome_value: Option<f64>,
 }
 
@@ -337,7 +337,7 @@ impl ActionSelector {
             // Record in history
             self.action_history.push(ActionHistoryEntry {
                 action_id: action.id,
-                timestamp: std::time::Instant::now(),
+                _timestamp: std::time::Instant::now(),
                 outcome_value: None,
             });
             if self.action_history.len() > self.max_history {
@@ -723,7 +723,7 @@ mod tests {
         // Execute action
         selector.action_history.push(ActionHistoryEntry {
             action_id: id,
-            timestamp: std::time::Instant::now(),
+            _timestamp: std::time::Instant::now(),
             outcome_value: None,
         });
 
@@ -749,7 +749,7 @@ mod tests {
         // Execute action
         selector.action_history.push(ActionHistoryEntry {
             action_id: id,
-            timestamp: std::time::Instant::now(),
+            _timestamp: std::time::Instant::now(),
             outcome_value: None,
         });
 

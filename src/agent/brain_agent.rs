@@ -17,7 +17,6 @@
 //! - World modeling
 //! - Communication interface
 
-use std::time::Duration;
 use uuid::Uuid;
 
 use crate::brain::{Brain, BrainConfig, ProcessingResult, SleepReport};
@@ -27,7 +26,6 @@ use crate::agent::{
 };
 use crate::core::{
     ActionTemplate, CuriositySystem, Domain, Goal, GoalId, WorldModel, Entity,
-    NeuromodulatorState,
 };
 use crate::error::Result;
 
@@ -261,7 +259,7 @@ impl BrainAgent {
         self.cycles_since_sleep += 1;
 
         let mut outputs = Vec::new();
-        let mut processing = None;
+        let processing = None;
         let mut sleep_report = None;
 
         // Sync neuromodulator state from brain to agent
@@ -410,6 +408,7 @@ impl Default for BrainAgent {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
     use super::*;
     use crate::core::{ActionCategory, ExpectedOutcome, Outcome, Priority};
 

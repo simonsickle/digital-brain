@@ -295,7 +295,7 @@ pub struct AgentLoop {
     /// Last tick time
     last_tick: Option<Instant>,
     /// Pending action (for multi-step execution)
-    pending_action: Option<ActionId>,
+    _pending_action: Option<ActionId>,
     /// Action execution callbacks
     action_handlers: HashMap<ActionId, Box<dyn Fn(&ActionTemplate) -> Outcome + Send + Sync>>,
 }
@@ -315,7 +315,7 @@ impl AgentLoop {
             config,
             stats: AgentLoopStats::default(),
             last_tick: None,
-            pending_action: None,
+            _pending_action: None,
             action_handlers: HashMap::new(),
         }
     }
