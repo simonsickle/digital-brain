@@ -454,6 +454,56 @@ impl HippocampusStore {
         Ok(memories)
     }
 
+    /// Add a tag to a memory.
+    pub fn add_tag(&self, memory_id: &str, tag: &str) -> Result<()> {
+        // Get current tags
+        let current: String = self.conn.query_row(
+            "SELECT context_tags FROM memories WHERE id = ?1",
+            params![memory_id],
+            |row| row.get(0)
+        ).map_err(|_| crate::error::BrainError::MemoryNotFound(memory_id.to_string()))?;
+
+        let mut tags: Vec<String> = serde_json::from_str(&current).unwrap_or_default();
+        
+        // Add tag if not present
+        if !tags.contains(&tag.to_string()) {
+            tags.push(tag.to_string());
+            let new_tags = serde_json::to_string(&tags)?;
+            
+            self.conn.execute(
+                "UPDATE memories SET context_tags = ?1 WHERE id = ?2",
+                params![new_tags, memory_id]
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Remove a tag from a memory.
+    pub fn remove_tag(&self, memory_id: &str, tag: &str) -> Result<bool> {
+        let current: String = self.conn.query_row(
+            "SELECT context_tags FROM memories WHERE id = ?1",
+            params![memory_id],
+            |row| row.get(0)
+        ).map_err(|_| crate::error::BrainError::MemoryNotFound(memory_id.to_string()))?;
+
+        let mut tags: Vec<String> = serde_json::from_str(&current).unwrap_or_default();
+        let original_len = tags.len();
+        
+        tags.retain(|t| t != tag);
+        
+        if tags.len() != original_len {
+            let new_tags = serde_json::to_string(&tags)?;
+            self.conn.execute(
+                "UPDATE memories SET context_tags = ?1 WHERE id = ?2",
+                params![new_tags, memory_id]
+            )?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Get the most emotional (highest absolute valence) memories.
     pub fn most_emotional(&self, limit: usize) -> Result<Vec<MemoryTrace>> {
         let mut stmt = self.conn.prepare(
