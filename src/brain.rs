@@ -424,6 +424,13 @@ impl Brain {
         self.hippocampus.import_json(json)
     }
 
+    /// Clear all memories.
+    /// 
+    /// WARNING: Destructive operation. Consider export_memories() first.
+    pub fn clear_memories(&self) -> Result<usize> {
+        self.hippocampus.clear_all()
+    }
+
     /// Ask the brain to reflect on something.
     pub fn reflect(&mut self, topic: &str) -> String {
         self.dmn

@@ -437,6 +437,22 @@ impl HippocampusStore {
         Ok(serde_json::to_string_pretty(&memories)?)
     }
 
+    /// Clear all memories.
+    /// 
+    /// WARNING: This is destructive and cannot be undone.
+    /// Use with caution - consider export_json() first for backup.
+    pub fn clear_all(&self) -> Result<usize> {
+        let count = self.conn.execute("SELECT COUNT(*) FROM memories", [])
+            .and_then(|_| {
+                let mut stmt = self.conn.prepare("SELECT COUNT(*) FROM memories")?;
+                stmt.query_row([], |row| row.get::<_, i64>(0))
+            })?;
+        
+        self.conn.execute("DELETE FROM memories", [])?;
+        
+        Ok(count as usize)
+    }
+
     /// Import memories from JSON.
     /// 
     /// Merges with existing memories (does not clear).

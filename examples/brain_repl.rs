@@ -40,6 +40,7 @@ fn print_help() {
   load <path>      Load brain state from directory
   export <file>    Export memories to JSON file
   import <file>    Import memories from JSON file
+  clear memories   Clear all memories (with confirmation)
   help             Show this help
   quit             Exit the REPL
 ");
@@ -248,6 +249,26 @@ fn main() -> digital_brain::Result<()> {
                         }
                     }
                     Err(e) => println!("Error reading file: {}", e),
+                }
+            }
+
+            "clear" => {
+                if arg != "memories" {
+                    println!("Usage: clear memories");
+                    println!("WARNING: This will delete ALL memories!");
+                    continue;
+                }
+                print!("Are you sure? This cannot be undone. (yes/no): ");
+                io::stdout().flush().ok();
+                let mut confirm = String::new();
+                stdin.lock().read_line(&mut confirm).ok();
+                if confirm.trim().to_lowercase() == "yes" {
+                    match brain.clear_memories() {
+                        Ok(count) => println!("✓ Cleared {} memories", count),
+                        Err(e) => println!("Error: {}", e),
+                    }
+                } else {
+                    println!("Aborted.");
                 }
             }
 
