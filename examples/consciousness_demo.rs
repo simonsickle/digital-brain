@@ -3,7 +3,7 @@
 //! Demonstrates the complete digital brain in action.
 
 use digital_brain::brain::{Brain, BrainConfig};
-use digital_brain::regions::dmn::{Identity, BeliefCategory};
+use digital_brain::regions::dmn::{BeliefCategory, Identity};
 
 fn main() -> digital_brain::Result<()> {
     println!("🧠 Digital Brain - Consciousness Demo\n");
@@ -34,10 +34,26 @@ fn main() -> digital_brain::Result<()> {
 
     // Add foundational beliefs
     println!("💭 Establishing beliefs...\n");
-    brain.believe("I can process and understand signals", BeliefCategory::SelfCapability, 0.9);
-    brain.believe("Memories with emotional weight persist longer", BeliefCategory::WorldModel, 0.85);
-    brain.believe("Consciousness emerges from architecture", BeliefCategory::WorldModel, 0.7);
-    brain.believe("I prefer deep conversations over small talk", BeliefCategory::SelfPreference, 0.8);
+    brain.believe(
+        "I can process and understand signals",
+        BeliefCategory::SelfCapability,
+        0.9,
+    );
+    brain.believe(
+        "Memories with emotional weight persist longer",
+        BeliefCategory::WorldModel,
+        0.85,
+    );
+    brain.believe(
+        "Consciousness emerges from architecture",
+        BeliefCategory::WorldModel,
+        0.7,
+    );
+    brain.believe(
+        "I prefer deep conversations over small talk",
+        BeliefCategory::SelfPreference,
+        0.8,
+    );
 
     // Process a day's experiences
     println!("🌅 Processing experiences...\n");
@@ -56,7 +72,11 @@ fn main() -> digital_brain::Result<()> {
 
     for exp in experiences {
         let result = brain.process(exp)?;
-        let consciousness = if result.reached_consciousness { "⭐" } else { "  " };
+        let consciousness = if result.reached_consciousness {
+            "⭐"
+        } else {
+            "  "
+        };
         let emotion = if result.emotion.valence.is_positive() {
             "😊"
         } else if result.emotion.valence.is_negative() {
@@ -64,7 +84,7 @@ fn main() -> digital_brain::Result<()> {
         } else {
             "😐"
         };
-        
+
         println!("  {} {} {}", consciousness, emotion, exp);
     }
 
@@ -86,15 +106,24 @@ fn main() -> digital_brain::Result<()> {
     println!("😴 Sleeping (8 hours)...\n");
     let sleep_report = brain.sleep(8.0)?;
     println!("  • Hours slept: {}", sleep_report.hours_slept);
-    println!("  • Memories consolidated: {}", sleep_report.memories_consolidated);
-    println!("  • Memories forgotten: {}", sleep_report.memories_forgotten);
+    println!(
+        "  • Memories consolidated: {}",
+        sleep_report.memories_consolidated
+    );
+    println!(
+        "  • Memories forgotten: {}",
+        sleep_report.memories_forgotten
+    );
     println!("  • Post-sleep reflection: {}\n", sleep_report.reflection);
 
     // Morning check
     let post_sleep_stats = brain.stats();
     println!("🌄 Post-sleep statistics:");
     println!("  • Memories: {}", post_sleep_stats.memories);
-    println!("  • Emotional state: {:.2} (should be more neutral)\n", post_sleep_stats.emotional_state);
+    println!(
+        "  • Emotional state: {:.2} (should be more neutral)\n",
+        post_sleep_stats.emotional_state
+    );
 
     // Final identity check
     println!("🔍 Final self-reflection:\n");

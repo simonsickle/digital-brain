@@ -30,21 +30,21 @@
 //! - **Prediction Engine**: Dopamine-like surprise and learning modulation
 //! - **Global Workspace**: Consciousness layer with attention competition
 
-pub mod signal;
+pub mod brain;
+pub mod core;
 pub mod error;
 pub mod regions;
-pub mod core;
-pub mod brain;
+pub mod signal;
 
-pub use signal::{BrainSignal, SignalType, MemoryTrace, Valence, Salience, Arousal};
-pub use error::{BrainError, Result};
-pub use core::{GlobalWorkspace, PredictionEngine, Prediction, PredictionError, Broadcast};
 pub use brain::{Brain, BrainConfig, BrainStats, ProcessingResult, SleepReport};
+pub use core::{Broadcast, GlobalWorkspace, Prediction, PredictionEngine, PredictionError};
+pub use error::{BrainError, Result};
+pub use signal::{Arousal, BrainSignal, MemoryTrace, Salience, SignalType, Valence};
 
 /// Prelude for convenient imports
 pub mod prelude {
-    pub use crate::signal::*;
+    pub use crate::core::{Broadcast, GlobalWorkspace, Prediction, PredictionEngine};
     pub use crate::error::*;
     pub use crate::regions::hippocampus::HippocampusStore;
-    pub use crate::core::{GlobalWorkspace, PredictionEngine, Prediction, Broadcast};
+    pub use crate::signal::*;
 }

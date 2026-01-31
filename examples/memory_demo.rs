@@ -26,7 +26,10 @@ fn main() -> Result<()> {
         let signal = BrainSignal::new("demo", SignalType::Memory, content)
             .with_valence(valence)
             .with_salience(salience)
-            .with_metadata("prediction_error", if valence.abs() > 0.5 { 0.7 } else { 0.2 });
+            .with_metadata(
+                "prediction_error",
+                if valence.abs() > 0.5 { 0.7 } else { 0.2 },
+            );
 
         let memory = hippocampus.encode(&signal)?;
         println!(
@@ -40,7 +43,7 @@ fn main() -> Result<()> {
     // Retrieve with valence boost
     println!("\n🔍 Retrieving memories (emotional ones first)...\n");
     let retrieved = hippocampus.retrieve(5, true)?;
-    
+
     for (i, memory) in retrieved.iter().enumerate() {
         let content: String = serde_json::from_value(memory.content.clone())
             .unwrap_or_else(|_| "unknown".to_string());

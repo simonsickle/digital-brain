@@ -10,7 +10,7 @@
 //! - Interference management
 
 #[allow(unused_imports)]
-use crate::signal::{BrainSignal, SignalType, Salience};
+use crate::signal::{BrainSignal, Salience, SignalType};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
@@ -193,7 +193,7 @@ impl PrefrontalCortex {
     fn load_item(&mut self, item: WorkingMemoryItem) -> Option<WorkingMemoryItem> {
         // Check capacity (chunks count as 1 item each)
         let effective_count = self.effective_item_count();
-        
+
         let displaced = if effective_count >= self.config.capacity {
             // Displace lowest priority item
             self.displace_lowest_priority()
@@ -208,10 +208,8 @@ impl PrefrontalCortex {
     /// Count items, treating chunks as single items.
     fn effective_item_count(&self) -> usize {
         let _chunked_items: usize = self.chunks.iter().map(|c| c.size()).sum();
-        let standalone_items = self.items.iter()
-            .filter(|i| i.chunk_id.is_none())
-            .count();
-        
+        let standalone_items = self.items.iter().filter(|i| i.chunk_id.is_none()).count();
+
         standalone_items + self.chunks.len()
     }
 
@@ -261,7 +259,7 @@ impl PrefrontalCortex {
         }
 
         let mut chunk = Chunk::new(label);
-        
+
         for id in item_ids {
             // Verify item exists and mark it as chunked
             for item in &mut self.items {
@@ -305,9 +303,10 @@ impl PrefrontalCortex {
 
         // Clean up empty chunks
         self.chunks.retain(|chunk| {
-            chunk.items.iter().any(|id| {
-                self.items.iter().any(|item| item.id == *id)
-            })
+            chunk
+                .items
+                .iter()
+                .any(|id| self.items.iter().any(|item| item.id == *id))
         });
 
         CycleResult {
@@ -346,7 +345,8 @@ impl PrefrontalCortex {
 
     /// Find items by tag.
     pub fn find_by_tag(&self, tag: &str) -> Vec<&WorkingMemoryItem> {
-        self.items.iter()
+        self.items
+            .iter()
             .filter(|item| item.tags.contains(&tag.to_string()))
             .collect()
     }
@@ -358,7 +358,9 @@ impl PrefrontalCortex {
 
     /// Get available capacity.
     pub fn available_capacity(&self) -> usize {
-        self.config.capacity.saturating_sub(self.effective_item_count())
+        self.config
+            .capacity
+            .saturating_sub(self.effective_item_count())
     }
 
     /// Get statistics.
@@ -421,7 +423,7 @@ mod tests {
             let signal = BrainSignal::new("test", SignalType::Memory, format!("item_{}", i))
                 .with_salience(0.5);
             let displaced = pfc.load(&signal);
-            
+
             if i < 3 {
                 assert!(displaced.is_none());
             } else {
@@ -440,18 +442,16 @@ mod tests {
         });
 
         // Load low priority item
-        let low = BrainSignal::new("test", SignalType::Memory, "low priority")
-            .with_salience(0.2);
+        let low = BrainSignal::new("test", SignalType::Memory, "low priority").with_salience(0.2);
         pfc.load(&low);
 
         // Load high priority item
-        let high = BrainSignal::new("test", SignalType::Memory, "high priority")
-            .with_salience(0.9);
+        let high = BrainSignal::new("test", SignalType::Memory, "high priority").with_salience(0.9);
         pfc.load(&high);
 
         // Load another high priority - should displace low
-        let high2 = BrainSignal::new("test", SignalType::Memory, "high priority 2")
-            .with_salience(0.8);
+        let high2 =
+            BrainSignal::new("test", SignalType::Memory, "high priority 2").with_salience(0.8);
         let displaced = pfc.load(&high2);
 
         assert!(displaced.is_some());

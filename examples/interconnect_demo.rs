@@ -3,8 +3,8 @@
 //! Visualizes how signals flow between brain modules in real-time.
 //! Shows the architecture in action - why it matters for consciousness.
 
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
 
 fn main() {
     println!("\n");
@@ -14,7 +14,7 @@ fn main() {
     println!("║   Watch signals flow through the architecture in real-time.           ║");
     println!("║   This is how consciousness emerges from modular processing.          ║");
     println!("╚═══════════════════════════════════════════════════════════════════════╝\n");
-    
+
     pause(500);
 
     // Show the architecture
