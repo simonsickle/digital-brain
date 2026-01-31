@@ -437,6 +437,28 @@ impl HippocampusStore {
         Ok(serde_json::to_string_pretty(&memories)?)
     }
 
+    /// Get memories from the last N hours.
+    /// 
+    /// Useful for reviewing recent activity.
+    pub fn recent_memories(&self, hours: f64, limit: usize) -> Result<Vec<MemoryTrace>> {
+        let cutoff = chrono::Utc::now() - chrono::Duration::seconds((hours * 3600.0) as i64);
+        let cutoff_str = cutoff.to_rfc3339();
+
+        let mut stmt = self.conn.prepare(
+            "SELECT * FROM memories 
+             WHERE created_at > ?1
+             ORDER BY created_at DESC
+             LIMIT ?2"
+        )?;
+
+        let memories = stmt
+            .query_map(params![cutoff_str, limit as i64], |row| self.row_to_memory(row))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(memories)
+    }
+
     /// Clear all memories.
     /// 
     /// WARNING: This is destructive and cannot be undone.

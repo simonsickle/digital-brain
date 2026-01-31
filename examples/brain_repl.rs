@@ -29,6 +29,7 @@ fn print_help() {
 
   process <text>   Process input through the brain
   recall <query>   Search memories for relevant content
+  recent [hours]   Show memories from last N hours (default: 1)
   reflect <topic>  Generate reflection on a topic
   sleep <hours>    Run sleep/consolidation cycle (default: 8)
   stats            Show brain statistics
@@ -124,6 +125,26 @@ fn main() -> digital_brain::Result<()> {
                                 let content: String = serde_json::from_value(mem.content.clone())
                                     .unwrap_or_else(|_| "?".to_string());
                                 let preview = if content.len() > 60 { &content[..60] } else { &content };
+                                println!("  {}. {} (v={:+.2})", i + 1, preview, mem.valence.value());
+                            }
+                        }
+                    }
+                    Err(e) => println!("Error: {}", e),
+                }
+            }
+
+            "recent" => {
+                let hours: f64 = arg.parse().unwrap_or(1.0);
+                match brain.recent_memories(hours, 10) {
+                    Ok(memories) => {
+                        if memories.is_empty() {
+                            println!("No memories in the last {:.1} hour(s)", hours);
+                        } else {
+                            println!("Memories from last {:.1} hour(s):", hours);
+                            for (i, mem) in memories.iter().enumerate() {
+                                let content: String = serde_json::from_value(mem.content.clone())
+                                    .unwrap_or_else(|_| "?".to_string());
+                                let preview = if content.len() > 50 { &content[..50] } else { &content };
                                 println!("  {}. {} (v={:+.2})", i + 1, preview, mem.valence.value());
                             }
                         }

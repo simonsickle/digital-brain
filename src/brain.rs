@@ -431,6 +431,11 @@ impl Brain {
         self.hippocampus.clear_all()
     }
 
+    /// Get memories from the last N hours.
+    pub fn recent_memories(&self, hours: f64, limit: usize) -> Result<Vec<MemoryTrace>> {
+        self.hippocampus.recent_memories(hours, limit)
+    }
+
     /// Ask the brain to reflect on something.
     pub fn reflect(&mut self, topic: &str) -> String {
         self.dmn
