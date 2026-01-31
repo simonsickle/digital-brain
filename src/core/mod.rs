@@ -2,6 +2,7 @@
 
 pub mod action;
 pub mod attention;
+pub mod curiosity;
 pub mod goals;
 pub mod nervous_system;
 pub mod neuromodulators;
@@ -25,6 +26,9 @@ pub use workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
 pub use action::{
     ActionCategory, ActionDecision, ActionId, ActionSelector, ActionStats, ActionTemplate,
     Condition, ExpectedOutcome, Outcome,
+};
+pub use curiosity::{
+    Competence, CuriosityStats, CuriositySystem, Domain, ExplorationEvent,
 };
 pub use goals::{
     Criterion, Goal, GoalEvent, GoalId, GoalManager, GoalStats, GoalStatus, Priority, TimeHorizon,
