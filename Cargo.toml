@@ -50,6 +50,10 @@ python = ["pyo3"]
 name = "memory_demo"
 path = "examples/memory_demo.rs"
 
+[[example]]
+name = "semantic_search_demo"
+path = "examples/semantic_search_demo.rs"
+
 [[bench]]
 name = "agent_bench"
 harness = false
