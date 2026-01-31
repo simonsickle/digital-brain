@@ -12,7 +12,7 @@ use crate::core::neuromodulators::{
 };
 use crate::core::prediction::{Prediction, PredictionEngine, PredictionError};
 use crate::core::workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
-use crate::error::Result;
+use crate::error::{BrainError, Result};
 use crate::regions::amygdala::{Amygdala, EmotionalAppraisal};
 use crate::regions::dmn::{
     Belief, BeliefCategory, DefaultModeNetwork, Identity, ReflectionTrigger,
@@ -454,6 +454,22 @@ impl Brain {
     /// Check if a specific memory exists.
     pub fn memory_exists(&self, memory_id: &str) -> bool {
         self.hippocampus.exists(memory_id)
+    }
+
+    /// Boost a memory's importance.
+    pub fn boost_memory(&self, memory_id: &str, amount: f64) -> Result<f64> {
+        self.hippocampus.boost(memory_id, amount)
+    }
+
+    /// Tag a memory.
+    pub fn tag_memory(&self, memory_id: &str, tag: &str) -> Result<()> {
+        self.hippocampus.add_tag(memory_id, tag)
+    }
+
+    /// Get a specific memory by ID.
+    pub fn get_memory(&self, memory_id: &str) -> Result<MemoryTrace> {
+        self.hippocampus.get(uuid::Uuid::parse_str(memory_id)
+            .map_err(|_| BrainError::MemoryNotFound(memory_id.to_string()))?)
     }
 
     /// Ask the brain to reflect on something.
