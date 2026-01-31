@@ -292,6 +292,11 @@ impl HippocampusStore {
             strength: row.get(10)?,
             associations: serde_json::from_str(&associations_str).unwrap_or_default(),
             context_tags: serde_json::from_str(&tags_str).unwrap_or_default(),
+            // Epistemic fields - defaults for backward compatibility
+            confidence: 0.7, // Default moderate confidence for existing memories
+            source: crate::signal::MemorySource::Unknown,
+            verified: false,
+            contradictions: Vec::new(),
         })
     }
 

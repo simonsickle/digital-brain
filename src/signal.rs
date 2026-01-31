@@ -291,6 +291,33 @@ pub struct MemoryTrace {
     pub associations: Vec<Uuid>,
     /// Retrieval cues
     pub context_tags: Vec<String>,
+
+    // --- Epistemic Provenance (Metacognition Paper 9) ---
+    /// Confidence in this memory (0.0 to 1.0)
+    pub confidence: f64,
+    /// Source of this memory
+    pub source: MemorySource,
+    /// Has this memory been verified?
+    pub verified: bool,
+    /// IDs of memories that contradict this one
+    pub contradictions: Vec<Uuid>,
+}
+
+/// Source of a memory - for epistemic provenance tracking.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MemorySource {
+    /// Directly experienced
+    Experience,
+    /// Told by another agent/user
+    Communicated,
+    /// Inferred from other memories
+    Inferred,
+    /// Retrieved from external source
+    External,
+    /// Inherited from prior context
+    Inherited,
+    /// Unknown/default source
+    Unknown,
 }
 
 impl MemoryTrace {
@@ -308,6 +335,32 @@ impl MemoryTrace {
             decay_rate *= 1.0 - surprise * 0.5;
         }
 
+        // Determine source from signal metadata or type
+        let source = signal
+            .metadata
+            .get("source")
+            .and_then(|v| v.as_str())
+            .map(|s| match s {
+                "experience" => MemorySource::Experience,
+                "communicated" => MemorySource::Communicated,
+                "inferred" => MemorySource::Inferred,
+                "external" => MemorySource::External,
+                "inherited" => MemorySource::Inherited,
+                _ => MemorySource::Unknown,
+            })
+            .unwrap_or(MemorySource::Experience);
+
+        // Initial confidence based on source and salience
+        let base_confidence = match source {
+            MemorySource::Experience => 0.8,
+            MemorySource::Communicated => 0.6,
+            MemorySource::Inferred => 0.5,
+            MemorySource::External => 0.7,
+            MemorySource::Inherited => 0.6,
+            MemorySource::Unknown => 0.5,
+        };
+        let confidence = (base_confidence + signal.salience.value() * 0.2).min(1.0);
+
         Self {
             id: Uuid::new_v4(),
             content: signal.content.clone(),
@@ -322,6 +375,10 @@ impl MemoryTrace {
             strength: 1.0,
             associations: Vec::new(),
             context_tags: Vec::new(),
+            confidence,
+            source,
+            verified: false,
+            contradictions: Vec::new(),
         }
     }
 
@@ -368,6 +425,58 @@ impl MemoryTrace {
         if !self.associations.contains(&other_id) {
             self.associations.push(other_id);
         }
+    }
+
+    // --- Epistemic Methods (Metacognition) ---
+
+    /// Mark this memory as verified (increases confidence).
+    pub fn verify(&mut self) {
+        self.verified = true;
+        self.confidence = (self.confidence + 0.2).min(1.0);
+    }
+
+    /// Add a contradicting memory (decreases confidence).
+    pub fn add_contradiction(&mut self, other_id: Uuid) {
+        if !self.contradictions.contains(&other_id) {
+            self.contradictions.push(other_id);
+            // Each contradiction reduces confidence
+            self.confidence = (self.confidence - 0.1).max(0.1);
+        }
+    }
+
+    /// Is this memory high-confidence (> 0.7)?
+    pub fn is_confident(&self) -> bool {
+        self.confidence > 0.7
+    }
+
+    /// Is this memory uncertain (< 0.5)?
+    pub fn is_uncertain(&self) -> bool {
+        self.confidence < 0.5
+    }
+
+    /// Get epistemic state as a string for output hedging.
+    pub fn epistemic_state(&self) -> &'static str {
+        if self.confidence > 0.9 && self.verified {
+            "certain"
+        } else if self.confidence > 0.7 {
+            "believe"
+        } else if self.confidence > 0.4 {
+            "suspect"
+        } else if self.confidence > 0.2 {
+            "guess"
+        } else {
+            "uncertain"
+        }
+    }
+
+    /// Adjust confidence based on new evidence.
+    pub fn adjust_confidence(&mut self, delta: f64) {
+        self.confidence = (self.confidence + delta).clamp(0.0, 1.0);
+    }
+
+    /// Was this memory directly experienced or secondhand?
+    pub fn is_firsthand(&self) -> bool {
+        matches!(self.source, MemorySource::Experience)
     }
 }
 
