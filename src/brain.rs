@@ -3,6 +3,9 @@
 //! This module wires all brain regions together into a functioning whole.
 //! The Brain struct coordinates processing cycles across all components.
 
+use crate::core::neuromodulators::{
+    NeuromodulatorState, NeuromodulatorySystem, RewardCategory, RewardQuality,
+};
 use crate::core::prediction::{Prediction, PredictionEngine, PredictionError};
 use crate::core::workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
 use crate::error::Result;
@@ -13,7 +16,7 @@ use crate::regions::dmn::{
 use crate::regions::hippocampus::HippocampusStore;
 use crate::regions::prefrontal::{PrefrontalConfig, PrefrontalCortex};
 use crate::regions::thalamus::{Destination, Thalamus};
-use crate::signal::{BrainSignal, MemoryTrace, SignalType};
+use crate::signal::{BrainSignal, MemoryTrace, Salience, SignalType};
 
 /// Configuration for the complete brain.
 #[derive(Debug, Clone)]
@@ -74,6 +77,8 @@ pub struct Brain {
     pub prediction: PredictionEngine,
     /// Self-model
     pub dmn: DefaultModeNetwork,
+    /// Neuromodulatory system (dopamine, serotonin, norepinephrine, acetylcholine)
+    pub neuromodulators: NeuromodulatorySystem,
     /// Processing cycle count
     cycle_count: u64,
     /// Configuration
@@ -112,6 +117,7 @@ impl Brain {
             workspace,
             prediction: PredictionEngine::new(),
             dmn: DefaultModeNetwork::new(),
+            neuromodulators: NeuromodulatorySystem::new(),
             cycle_count: 0,
             config,
         })
@@ -127,14 +133,22 @@ impl Brain {
         let content = input.into();
 
         // 1. Create sensory signal
-        let signal = BrainSignal::new("external", SignalType::Sensory, &content);
+        let mut signal = BrainSignal::new("external", SignalType::Sensory, &content);
+
+        // 1.5 Neuromodulatory influence on incoming signal
+        // Arousal state affects salience perception
+        let arousal_boost = (self.neuromodulators.arousal() - 0.5) * 0.2;
+        signal.salience = Salience::new(signal.salience.value() + arousal_boost);
 
         // 2. Gate through thalamus
         self.thalamus.receive(signal);
         let routed_signals = self.thalamus.process_cycle();
 
         if routed_signals.is_empty() {
-            // Signal was filtered - create minimal result
+            // Signal was filtered - update neuromodulators anyway
+            self.neuromodulators.update();
+            self.cycle_count += 1;
+
             return Ok(ProcessingResult {
                 tagged_signal: BrainSignal::new("external", SignalType::Sensory, &content),
                 emotion: self.amygdala.appraise(&BrainSignal::new(
@@ -156,9 +170,29 @@ impl Brain {
         let tagged_signal = self.amygdala.tag_signal(routed.signal.clone());
         let emotion = self.amygdala.appraise(&tagged_signal);
 
+        // 3.5 Neuromodulatory response to emotional content
+        if emotion.is_significant {
+            // Emotional content affects norepinephrine (arousal)
+            self.neuromodulators
+                .norepinephrine
+                .level
+                .adjust(emotion.arousal.value() * 0.1);
+
+            // Threat detection affects stress
+            if emotion.valence.is_negative() && emotion.arousal.is_high() {
+                self.neuromodulators
+                    .signal_threat(emotion.arousal.value() * 0.5);
+            }
+        }
+
         // 4. Update DMN emotional state
         self.dmn
             .update_emotional_state(tagged_signal.valence.value());
+
+        // Update serotonin mood tracking
+        self.neuromodulators
+            .serotonin
+            .record_mood(tagged_signal.valence.value());
 
         // 5. Route to appropriate modules
         let mut reached_consciousness = false;
@@ -171,9 +205,20 @@ impl Brain {
                     self.workspace.submit(tagged_signal.clone());
                 }
                 Destination::Hippocampus => {
-                    memory = Some(self.hippocampus.encode(&tagged_signal)?);
+                    // Acetylcholine modulates memory encoding strength
+                    self.neuromodulators.acetylcholine.record_encoding();
+                    let encoding_strength = self.neuromodulators.encoding_strength();
+
+                    let mut trace = self.hippocampus.encode(&tagged_signal)?;
+
+                    // Strengthen memory based on acetylcholine level
+                    trace.strength *= encoding_strength;
+                    memory = Some(trace);
                 }
                 Destination::Prefrontal => {
+                    // Focus attention through norepinephrine
+                    self.neuromodulators
+                        .focus_on(format!("processing:{}", &content[..content.len().min(20)]));
                     self.prefrontal.load(&tagged_signal);
                 }
                 _ => {}
@@ -185,12 +230,31 @@ impl Brain {
         if !broadcasts.is_empty() {
             reached_consciousness = true;
 
+            // Conscious access is a meaningful event - process as reward
+            let quality = RewardQuality::new()
+                .with_depth(self.neuromodulators.acetylcholine.depth())
+                .with_novelty(if emotion.is_significant { 0.7 } else { 0.3 })
+                .with_goal_alignment(0.5) // Default; could be computed from goals
+                .with_intrinsic(0.6)
+                .with_durability(if memory.is_some() { 0.7 } else { 0.3 });
+
+            self.neuromodulators.process_reward(
+                0.3 * emotion.arousal.value(), // Magnitude based on arousal
+                RewardCategory::Understanding,
+                quality,
+            );
+
             // Strong conscious experience triggers reflection
             if emotion.is_significant {
                 let reflection = self
                     .dmn
                     .reflect(ReflectionTrigger::Emotional, Some(&content));
                 reflections.push(reflection.content);
+
+                // Signal deep processing for acetylcholine
+                self.neuromodulators
+                    .acetylcholine
+                    .signal_deep_processing(0.5);
             }
         }
 
@@ -206,6 +270,9 @@ impl Brain {
         if emotion.is_significant {
             self.dmn.narrate(&content, emotion.arousal.value());
         }
+
+        // 10. Neuromodulatory system homeostatic update
+        self.neuromodulators.update();
 
         self.cycle_count += 1;
 
@@ -255,6 +322,24 @@ impl Brain {
             self.amygdala.decay();
         }
 
+        // 5. Neuromodulatory restoration during sleep
+        // Sleep restores neuromodulator levels toward baseline
+        let sleep_cycles = (hours * 2.0) as usize; // 2 update cycles per hour
+        for _ in 0..sleep_cycles {
+            self.neuromodulators.update();
+
+            // Extra serotonin restoration during sleep (mood regulation)
+            self.neuromodulators.serotonin.level.adjust(0.02);
+
+            // Stress reduction during sleep
+            if self.neuromodulators.norepinephrine.stress() > 0.0 {
+                self.neuromodulators.signal_safety();
+            }
+        }
+
+        // Clear focus during sleep
+        self.neuromodulators.norepinephrine.clear_focus();
+
         Ok(SleepReport {
             hours_slept: hours,
             memories_forgotten: forgotten,
@@ -291,6 +376,44 @@ impl Brain {
     /// Focus attention on something.
     pub fn focus(&mut self, topic: &str) {
         self.thalamus.focus_attention(topic);
+        // Also update norepinephrine focus
+        self.neuromodulators.focus_on(topic.to_string());
+    }
+
+    /// Get current neuromodulator state.
+    pub fn neuromodulator_state(&self) -> NeuromodulatorState {
+        self.neuromodulators.state()
+    }
+
+    /// Process a reward event (for external reward signals).
+    pub fn reward(&mut self, magnitude: f64, category: RewardCategory, quality: RewardQuality) {
+        self.neuromodulators
+            .process_reward(magnitude, category, quality);
+    }
+
+    /// Signal that a goal was achieved (high-quality reward).
+    pub fn goal_achieved(&mut self, description: &str) {
+        let quality = RewardQuality::new()
+            .with_depth(0.8)
+            .with_goal_alignment(1.0)
+            .with_durability(0.9)
+            .with_intrinsic(0.7)
+            .with_novelty(0.5);
+
+        self.neuromodulators
+            .process_reward(0.7, RewardCategory::Achievement, quality);
+
+        // Also reward patience if we waited for this
+        self.neuromodulators.serotonin.reward_patience(0.3);
+
+        // Narrate the achievement
+        self.dmn.narrate(description, 0.8);
+    }
+
+    /// Check if the brain advises patience (waiting for better outcome).
+    pub fn should_wait(&self, immediate_value: f64, delayed_value: f64, delay_cycles: u32) -> bool {
+        self.neuromodulators
+            .should_wait_for_better(immediate_value, delayed_value, delay_cycles)
     }
 
     /// Get current conscious contents.
@@ -310,7 +433,7 @@ impl Brain {
         let prefrontal_stats = self.prefrontal.stats();
         let dmn_stats = self.dmn.stats();
         let (thalamus_recv, thalamus_pass, thalamus_filt, _) = self.thalamus.stats();
-        let prediction_stats = self.prediction.stats();
+        let _prediction_stats = self.prediction.stats(); // Kept for potential future use
 
         BrainStats {
             cycles: self.cycle_count,
@@ -322,7 +445,8 @@ impl Brain {
             signals_processed: thalamus_recv,
             signals_passed: thalamus_pass,
             signals_filtered: thalamus_filt,
-            learning_rate: prediction_stats.current_learning_rate,
+            learning_rate: self.neuromodulators.learning_rate(), // Use neuromodulator-derived rate
+            neuromodulators: self.neuromodulators.state(),
         }
     }
 }
@@ -343,7 +467,7 @@ pub struct SleepReport {
 }
 
 /// Comprehensive brain statistics.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct BrainStats {
     pub cycles: u64,
     pub memories: usize,
@@ -355,6 +479,38 @@ pub struct BrainStats {
     pub signals_passed: u64,
     pub signals_filtered: u64,
     pub learning_rate: f64,
+    /// Neuromodulator levels and derived states
+    pub neuromodulators: NeuromodulatorState,
+}
+
+impl Default for BrainStats {
+    fn default() -> Self {
+        Self {
+            cycles: 0,
+            memories: 0,
+            conscious_items: 0,
+            working_memory_items: 0,
+            beliefs: 0,
+            emotional_state: 0.0,
+            signals_processed: 0,
+            signals_passed: 0,
+            signals_filtered: 0,
+            learning_rate: 0.1,
+            neuromodulators: NeuromodulatorState {
+                dopamine: 0.5,
+                serotonin: 0.5,
+                norepinephrine: 0.4,
+                acetylcholine: 0.5,
+                motivation: 0.5,
+                patience: 0.5,
+                stress: 0.0,
+                learning_depth: 0.5,
+                is_satiated: false,
+                is_stressed: false,
+                mood_stability: 0.8,
+            },
+        }
+    }
 }
 
 // Implement default for MemoryStats
