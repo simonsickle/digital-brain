@@ -397,6 +397,38 @@ impl HippocampusStore {
         ).is_ok()
     }
 
+    /// Boost a memory's strength (mark as important).
+    /// 
+    /// Useful for externally marking memories as significant.
+    pub fn boost(&self, memory_id: &str, amount: f64) -> Result<f64> {
+        let current: f64 = self.conn.query_row(
+            "SELECT strength FROM memories WHERE id = ?1",
+            params![memory_id],
+            |row| row.get(0)
+        ).map_err(|_| crate::error::BrainError::MemoryNotFound(memory_id.to_string()))?;
+
+        let new_strength = (current + amount).min(1.0).max(0.0);
+        
+        self.conn.execute(
+            "UPDATE memories SET strength = ?1 WHERE id = ?2",
+            params![new_strength, memory_id]
+        )?;
+
+        Ok(new_strength)
+    }
+
+    /// Update a memory's valence.
+    pub fn set_valence(&self, memory_id: &str, valence: f64) -> Result<()> {
+        let clamped = valence.max(-1.0).min(1.0);
+        
+        self.conn.execute(
+            "UPDATE memories SET valence = ?1 WHERE id = ?2",
+            params![clamped, memory_id]
+        )?;
+
+        Ok(())
+    }
+
     /// Get statistics about the memory system.
     pub fn stats(&self) -> Result<MemoryStats> {
         let mut stmt = self.conn.prepare(
