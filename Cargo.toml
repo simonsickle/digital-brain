@@ -49,3 +49,7 @@ python = ["pyo3"]
 [[example]]
 name = "memory_demo"
 path = "examples/memory_demo.rs"
+
+[[bench]]
+name = "agent_bench"
+harness = false
