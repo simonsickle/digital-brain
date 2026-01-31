@@ -3,6 +3,7 @@
 //! This module wires all brain regions together into a functioning whole.
 //! The Brain struct coordinates processing cycles across all components.
 
+use crate::core::nervous_system::{BrainRegion, NervousSystem, NervousSystemStats};
 use crate::core::neuromodulators::{
     NeuromodulatorState, NeuromodulatorySystem, RewardCategory, RewardQuality,
 };
@@ -79,6 +80,8 @@ pub struct Brain {
     pub dmn: DefaultModeNetwork,
     /// Neuromodulatory system (dopamine, serotonin, norepinephrine, acetylcholine)
     pub neuromodulators: NeuromodulatorySystem,
+    /// Nervous system (inter-module signal routing)
+    pub nervous_system: NervousSystem,
     /// Processing cycle count
     cycle_count: u64,
     /// Configuration
@@ -118,6 +121,7 @@ impl Brain {
             prediction: PredictionEngine::new(),
             dmn: DefaultModeNetwork::new(),
             neuromodulators: NeuromodulatorySystem::new(),
+            nervous_system: NervousSystem::new(),
             cycle_count: 0,
             config,
         })
@@ -139,6 +143,10 @@ impl Brain {
         // Arousal state affects salience perception
         let arousal_boost = (self.neuromodulators.arousal() - 0.5) * 0.2;
         signal.salience = Salience::new(signal.salience.value() + arousal_boost);
+
+        // 1.6 Record signal entering through nervous system
+        self.nervous_system
+            .transmit(BrainRegion::External, BrainRegion::Thalamus, signal.clone());
 
         // 2. Gate through thalamus
         self.thalamus.receive(signal);
@@ -167,6 +175,12 @@ impl Brain {
         let routed = &routed_signals[0];
 
         // 3. Emotional tagging by amygdala
+        // Record signal flowing to amygdala via nervous system
+        self.nervous_system.transmit(
+            BrainRegion::Thalamus,
+            BrainRegion::Amygdala,
+            routed.signal.clone(),
+        );
         let tagged_signal = self.amygdala.tag_signal(routed.signal.clone());
         let emotion = self.amygdala.appraise(&tagged_signal);
 
@@ -202,9 +216,28 @@ impl Brain {
         for dest in &routed.destinations {
             match dest {
                 Destination::Workspace => {
+                    // Track signal to workspace via nervous system
+                    self.nervous_system.transmit(
+                        BrainRegion::Amygdala,
+                        BrainRegion::Workspace,
+                        tagged_signal.clone(),
+                    );
                     self.workspace.submit(tagged_signal.clone());
                 }
                 Destination::Hippocampus => {
+                    // Track signal to hippocampus
+                    self.nervous_system.transmit(
+                        BrainRegion::Thalamus,
+                        BrainRegion::Hippocampus,
+                        tagged_signal.clone(),
+                    );
+                    // Also track emotional tagging pathway
+                    self.nervous_system.transmit(
+                        BrainRegion::Amygdala,
+                        BrainRegion::Hippocampus,
+                        tagged_signal.clone(),
+                    );
+
                     // Acetylcholine modulates memory encoding strength
                     self.neuromodulators.acetylcholine.record_encoding();
                     let encoding_strength = self.neuromodulators.encoding_strength();
@@ -216,6 +249,13 @@ impl Brain {
                     memory = Some(trace);
                 }
                 Destination::Prefrontal => {
+                    // Track signal to prefrontal
+                    self.nervous_system.transmit(
+                        BrainRegion::Thalamus,
+                        BrainRegion::Prefrontal,
+                        tagged_signal.clone(),
+                    );
+
                     // Focus attention through norepinephrine
                     self.neuromodulators
                         .focus_on(format!("processing:{}", &content[..content.len().min(20)]));
@@ -229,6 +269,11 @@ impl Brain {
         let broadcasts = self.workspace.process_cycle();
         if !broadcasts.is_empty() {
             reached_consciousness = true;
+
+            // Broadcast conscious content through nervous system to all regions
+            let broadcast_signal =
+                BrainSignal::new("workspace", SignalType::Broadcast, &content).with_salience(1.0);
+            self.nervous_system.broadcast(broadcast_signal);
 
             // Conscious access is a meaningful event - process as reward
             let quality = RewardQuality::new()
@@ -572,6 +617,59 @@ impl Brain {
             learning_rate: self.neuromodulators.learning_rate(), // Use neuromodulator-derived rate
             neuromodulators: self.neuromodulators.state(),
         }
+    }
+
+    /// Get nervous system statistics (signal routing between regions).
+    pub fn nervous_system_stats(&self) -> NervousSystemStats {
+        self.nervous_system.stats()
+    }
+
+    /// Visualize the neural pathways between brain regions.
+    pub fn visualize_pathways(&self) -> String {
+        self.nervous_system.visualize()
+    }
+
+    /// Apply neuromodulator effects to nervous system pathways.
+    /// Call this to reflect neuromodulator state changes in pathway strengths.
+    pub fn sync_neuromodulators_to_pathways(&mut self) {
+        let state = self.neuromodulators.state();
+
+        // Norepinephrine increases Thalamus → Amygdala (heightened vigilance)
+        let ne_factor = 1.0 + (state.norepinephrine - 0.5) * 0.4;
+        self.nervous_system.apply_modulation(
+            BrainRegion::Thalamus,
+            BrainRegion::Amygdala,
+            ne_factor,
+        );
+
+        // Acetylcholine enhances Hippocampus pathways (learning)
+        let ach_factor = 1.0 + (state.acetylcholine - 0.5) * 0.3;
+        self.nervous_system.apply_modulation(
+            BrainRegion::Thalamus,
+            BrainRegion::Hippocampus,
+            ach_factor,
+        );
+        self.nervous_system.apply_modulation(
+            BrainRegion::Amygdala,
+            BrainRegion::Hippocampus,
+            ach_factor,
+        );
+
+        // Dopamine enhances Prefrontal → Workspace (motivation for conscious access)
+        let da_factor = 1.0 + (state.dopamine - 0.5) * 0.3;
+        self.nervous_system.apply_modulation(
+            BrainRegion::Prefrontal,
+            BrainRegion::Workspace,
+            da_factor,
+        );
+
+        // GABA reduces Amygdala → Workspace (inhibition of impulsive reactions)
+        let gaba_factor = 1.0 - (state.gaba - 0.5) * 0.2;
+        self.nervous_system.apply_modulation(
+            BrainRegion::Amygdala,
+            BrainRegion::Workspace,
+            gaba_factor,
+        );
     }
 }
 

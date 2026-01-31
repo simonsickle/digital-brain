@@ -102,6 +102,13 @@ fn main() -> digital_brain::Result<()> {
     println!("  • Emotional state: {:.2}", stats.emotional_state);
     println!("  • Learning rate: {:.3}\n", stats.learning_rate);
 
+    // Show nervous system activity
+    let ns_stats = brain.nervous_system_stats();
+    println!("🧠 Nervous system activity:");
+    println!("  • Total pathways: {}", ns_stats.total_pathways);
+    println!("  • Signals routed: {}", ns_stats.total_signals_routed);
+    println!("  • Signals in queues: {}\n", ns_stats.queued_signals);
+
     // Sleep and consolidate
     println!("😴 Sleeping (8 hours)...\n");
     let sleep_report = brain.sleep(8.0)?;
