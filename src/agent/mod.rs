@@ -6,9 +6,11 @@
 //! - GoalManager (tracking objectives)
 //! - WorldModel (representing external state)
 //! - CommunicationSystem (structured output generation)
+//! - MultiAgentSystem (inter-agent communication and theory of mind)
 
 pub mod agent_loop;
 pub mod communication;
+pub mod multi_agent;
 
 pub use agent_loop::{
     AgentConfig, AgentCycleResult, AgentLoop, AgentState, Percept, PerceptType,
@@ -16,4 +18,8 @@ pub use agent_loop::{
 pub use communication::{
     CommunicationIntent, CommunicationStats, CommunicationStyle, CommunicationSystem,
     ConversationMessage, IntentType,
+};
+pub use multi_agent::{
+    AgentId, AgentMessage, AgentModel, AgentProfile, MessageType, MultiAgentStats,
+    MultiAgentSystem,
 };
