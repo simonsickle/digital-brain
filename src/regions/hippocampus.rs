@@ -404,6 +404,64 @@ impl HippocampusStore {
 
         Ok(stats)
     }
+
+    /// Export all memories as JSON.
+    /// 
+    /// Useful for backup, analysis, or migration.
+    pub fn export_json(&self) -> Result<String> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, content, valence, salience, surprise, created_at, 
+                    last_accessed, access_count, consolidated, strength
+             FROM memories
+             ORDER BY created_at DESC"
+        )?;
+
+        let memories: Vec<serde_json::Value> = stmt
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "id": row.get::<_, String>(0)?,
+                    "content": row.get::<_, String>(1)?,
+                    "valence": row.get::<_, f64>(2)?,
+                    "salience": row.get::<_, f64>(3)?,
+                    "surprise": row.get::<_, f64>(4)?,
+                    "created_at": row.get::<_, String>(5)?,
+                    "last_accessed": row.get::<_, String>(6)?,
+                    "access_count": row.get::<_, i64>(7)?,
+                    "consolidated": row.get::<_, i32>(8)? == 1,
+                    "strength": row.get::<_, f64>(9)?,
+                }))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(serde_json::to_string_pretty(&memories)?)
+    }
+
+    /// Import memories from JSON.
+    /// 
+    /// Merges with existing memories (does not clear).
+    pub fn import_json(&self, json: &str) -> Result<usize> {
+        let memories: Vec<serde_json::Value> = serde_json::from_str(json)?;
+        let mut count = 0;
+
+        for mem in memories {
+            let content = mem.get("content")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| crate::error::BrainError::InvalidState("Missing content".into()))?;
+            
+            let valence = mem.get("valence").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let salience = mem.get("salience").and_then(|v| v.as_f64()).unwrap_or(0.5);
+
+            let signal = crate::signal::BrainSignal::new("import", crate::signal::SignalType::Memory, content)
+                .with_valence(valence)
+                .with_salience(salience);
+
+            self.encode(&signal)?;
+            count += 1;
+        }
+
+        Ok(count)
+    }
 }
 
 /// Statistics about the memory system.
