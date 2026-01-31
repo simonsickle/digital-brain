@@ -4,4 +4,5 @@ pub mod amygdala;
 pub mod dmn;
 pub mod hippocampus;
 pub mod prefrontal;
+pub mod schema;
 pub mod thalamus;
