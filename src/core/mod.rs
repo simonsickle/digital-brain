@@ -1,10 +1,14 @@
 //! Core systems - cross-cutting functionality.
 
+pub mod attention;
 pub mod nervous_system;
 pub mod neuromodulators;
 pub mod prediction;
 pub mod workspace;
 
+pub use attention::{
+    AttentionBudget, AttentionStats, COMPLEXITY_KEYWORDS, TaskComplexity, estimate_complexity,
+};
 pub use nervous_system::{
     BrainRegion, NervousSystem, NervousSystemConfig, NervousSystemStats, Pathway, SignalTrace,
 };
