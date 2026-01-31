@@ -12,8 +12,8 @@
 use crate::signal::{BrainSignal, SignalType};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{BinaryHeap, VecDeque};
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, VecDeque};
 use uuid::Uuid;
 
 /// Configuration for the global workspace.
@@ -32,7 +32,7 @@ pub struct WorkspaceConfig {
 impl Default for WorkspaceConfig {
     fn default() -> Self {
         Self {
-            capacity: 7,  // Miller's magic number
+            capacity: 7, // Miller's magic number
             salience_threshold: 0.3,
             broadcast_duration: 5,
             max_candidates_per_cycle: 50,
@@ -207,7 +207,10 @@ impl GlobalWorkspace {
         self.active_broadcasts.retain(|b| b.is_active());
 
         // 2. Calculate available capacity
-        let available = self.config.capacity.saturating_sub(self.active_broadcasts.len());
+        let available = self
+            .config
+            .capacity
+            .saturating_sub(self.active_broadcasts.len());
 
         // 3. Select winners from competition queue
         let mut selected = 0;
@@ -251,16 +254,15 @@ impl GlobalWorkspace {
 
     /// Get statistics about workspace activity.
     pub fn stats(&self) -> WorkspaceStats {
-        let recent_broadcasts: Vec<_> = self.broadcast_history
-            .iter()
-            .rev()
-            .take(100)
-            .collect();
+        let recent_broadcasts: Vec<_> = self.broadcast_history.iter().rev().take(100).collect();
 
         let avg_winning_score = if recent_broadcasts.is_empty() {
             0.0
         } else {
-            recent_broadcasts.iter().map(|b| b.winning_score).sum::<f64>()
+            recent_broadcasts
+                .iter()
+                .map(|b| b.winning_score)
+                .sum::<f64>()
                 / recent_broadcasts.len() as f64
         };
 
@@ -325,15 +327,13 @@ mod tests {
     #[test]
     fn test_salience_threshold() {
         let mut ws = GlobalWorkspace::new();
-        
+
         // Low salience signal should be rejected
-        let low = BrainSignal::new("test", SignalType::Sensory, "low")
-            .with_salience(0.1);
+        let low = BrainSignal::new("test", SignalType::Sensory, "low").with_salience(0.1);
         assert!(!ws.submit(low));
-        
+
         // High salience signal should be accepted
-        let high = BrainSignal::new("test", SignalType::Sensory, "high")
-            .with_salience(0.8);
+        let high = BrainSignal::new("test", SignalType::Sensory, "high").with_salience(0.8);
         assert!(ws.submit(high));
     }
 
@@ -343,18 +343,18 @@ mod tests {
             capacity: 2,
             ..Default::default()
         });
-        
+
         // Submit 3 signals with different salience
         ws.submit(BrainSignal::new("test", SignalType::Sensory, "low").with_salience(0.4));
         ws.submit(BrainSignal::new("test", SignalType::Sensory, "high").with_salience(0.9));
         ws.submit(BrainSignal::new("test", SignalType::Sensory, "medium").with_salience(0.6));
-        
+
         // Process cycle
         let broadcasts = ws.process_cycle();
-        
+
         // Only 2 should win (capacity limit)
         assert_eq!(broadcasts.len(), 2);
-        
+
         // Highest salience should win
         assert!(broadcasts[0].winning_score > broadcasts[1].winning_score);
     }
@@ -365,25 +365,25 @@ mod tests {
             capacity: 1,
             ..Default::default()
         });
-        
+
         // Submit neutral and emotional signals with same base salience
         ws.submit(
             BrainSignal::new("test", SignalType::Sensory, "neutral")
                 .with_salience(0.7)
-                .with_valence(0.0)
+                .with_valence(0.0),
         );
         ws.submit(
             BrainSignal::new("test", SignalType::Sensory, "emotional")
                 .with_salience(0.7)
                 .with_valence(0.9)
-                .with_arousal(0.8)
+                .with_arousal(0.8),
         );
-        
+
         let broadcasts = ws.process_cycle();
-        
+
         // Emotional signal should win due to boost
-        let content: String = serde_json::from_value(broadcasts[0].signal.content.clone())
-            .unwrap_or_default();
+        let content: String =
+            serde_json::from_value(broadcasts[0].signal.content.clone()).unwrap_or_default();
         assert_eq!(content, "emotional");
     }
 
@@ -394,16 +394,16 @@ mod tests {
             broadcast_duration: 2,
             ..Default::default()
         });
-        
+
         ws.submit(BrainSignal::new("test", SignalType::Sensory, "test").with_salience(0.8));
         ws.process_cycle();
-        
+
         assert_eq!(ws.conscious_contents().len(), 1);
-        
+
         // Cycle 2 - still active
         ws.process_cycle();
         assert_eq!(ws.conscious_contents().len(), 1);
-        
+
         // Cycle 3 - should expire
         ws.process_cycle();
         assert_eq!(ws.conscious_contents().len(), 0);
@@ -416,17 +416,17 @@ mod tests {
             broadcast_duration: 10,
             ..Default::default()
         });
-        
+
         // Submit 5 high-salience signals
         for i in 0..5 {
             ws.submit(
                 BrainSignal::new("test", SignalType::Sensory, format!("signal{}", i))
-                    .with_salience(0.8)
+                    .with_salience(0.8),
             );
         }
-        
+
         ws.process_cycle();
-        
+
         // Only 3 should be in consciousness
         assert_eq!(ws.conscious_contents().len(), 3);
     }

@@ -10,7 +10,7 @@
 //! - Binding disparate signals
 
 #[allow(unused_imports)]
-use crate::signal::{BrainSignal, SignalType, Salience, Arousal};
+use crate::signal::{Arousal, BrainSignal, Salience, SignalType};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -116,7 +116,7 @@ impl HabituationTracker {
     fn get_habituation(&self, content: &serde_json::Value) -> f64 {
         let hash = Self::hash_content(content);
         let exposures = self.exposures.get(&hash).copied().unwrap_or(0);
-        
+
         // Habituation increases with exposures, caps at 0.8
         (exposures as f64 * 0.1).min(0.8)
     }
@@ -126,7 +126,7 @@ impl HabituationTracker {
         for count in self.exposures.values_mut() {
             *count = (*count as f64 * (1.0 - rate)).floor() as usize;
         }
-        
+
         // Remove zero-exposure entries
         self.exposures.retain(|_, v| *v > 0);
     }
@@ -203,10 +203,10 @@ impl Thalamus {
         effective_salience += signal.emotional_intensity() * self.config.emotional_boost;
 
         // Attention focus boost
-        if let Some(ref focus) = self.attention_focus {
-            if signal.content.to_string().contains(focus) {
-                effective_salience += 0.2;
-            }
+        if let Some(ref focus) = self.attention_focus
+            && signal.content.to_string().contains(focus)
+        {
+            effective_salience += 0.2;
         }
 
         // Habituation penalty
@@ -216,13 +216,13 @@ impl Thalamus {
         // Check threshold
         if effective_salience < self.config.gate_threshold {
             self.stats.signals_filtered += 1;
-            
+
             let reason = if habituation > 0.3 {
                 FilterReason::Habituated
             } else {
                 FilterReason::BelowThreshold
             };
-            
+
             return GateResult::Filtered {
                 reason,
                 salience: effective_salience,
@@ -282,10 +282,8 @@ impl Thalamus {
         }
 
         // High emotional content always goes to hippocampus
-        if signal.emotional_intensity() > 0.5 {
-            if !destinations.contains(&Destination::Hippocampus) {
-                destinations.push(Destination::Hippocampus);
-            }
+        if signal.emotional_intensity() > 0.5 && !destinations.contains(&Destination::Hippocampus) {
+            destinations.push(Destination::Hippocampus);
         }
 
         RoutedSignal {
@@ -302,7 +300,8 @@ impl Thalamus {
         let mut routed = Vec::new();
 
         // Process up to max_throughput signals
-        let to_process: Vec<_> = self.input_buffer
+        let to_process: Vec<_> = self
+            .input_buffer
             .drain(..self.config.max_throughput.min(self.input_buffer.len()))
             .collect();
 
@@ -371,13 +370,11 @@ mod tests {
         let mut thalamus = Thalamus::new();
 
         // Low salience should be filtered
-        let low = BrainSignal::new("test", SignalType::Sensory, "low")
-            .with_salience(0.1);
+        let low = BrainSignal::new("test", SignalType::Sensory, "low").with_salience(0.1);
         assert!(matches!(thalamus.gate(low), GateResult::Filtered { .. }));
 
         // High salience should pass
-        let high = BrainSignal::new("test", SignalType::Sensory, "high")
-            .with_salience(0.8);
+        let high = BrainSignal::new("test", SignalType::Sensory, "high").with_salience(0.8);
         assert!(matches!(thalamus.gate(high), GateResult::Passed(_)));
     }
 
@@ -389,7 +386,10 @@ mod tests {
         let neutral = BrainSignal::new("test", SignalType::Sensory, "neutral")
             .with_salience(0.15)
             .with_valence(0.0);
-        assert!(matches!(thalamus.gate(neutral), GateResult::Filtered { .. }));
+        assert!(matches!(
+            thalamus.gate(neutral),
+            GateResult::Filtered { .. }
+        ));
 
         // Same salience but with emotion should pass
         let emotional = BrainSignal::new("test", SignalType::Sensory, "emotional")
@@ -404,9 +404,12 @@ mod tests {
         let mut thalamus = Thalamus::new();
 
         // First exposure passes easily
-        let signal = BrainSignal::new("test", SignalType::Sensory, "repeated content")
-            .with_salience(0.5);
-        assert!(matches!(thalamus.gate(signal.clone()), GateResult::Passed(_)));
+        let signal =
+            BrainSignal::new("test", SignalType::Sensory, "repeated content").with_salience(0.5);
+        assert!(matches!(
+            thalamus.gate(signal.clone()),
+            GateResult::Passed(_)
+        ));
 
         // Multiple exposures increase habituation
         for _ in 0..10 {
@@ -429,12 +432,12 @@ mod tests {
         thalamus.focus_attention("important");
 
         // Borderline signal without focus keyword
-        let unfocused = BrainSignal::new("test", SignalType::Sensory, "regular content")
-            .with_salience(0.15);
-        
+        let _unfocused =
+            BrainSignal::new("test", SignalType::Sensory, "regular content").with_salience(0.15);
+
         // Borderline signal with focus keyword
-        let focused = BrainSignal::new("test", SignalType::Sensory, "important content")
-            .with_salience(0.15);
+        let focused =
+            BrainSignal::new("test", SignalType::Sensory, "important content").with_salience(0.15);
 
         // Focused signal should get boosted and pass
         assert!(matches!(thalamus.gate(focused), GateResult::Passed(_)));
@@ -447,8 +450,7 @@ mod tests {
         // Suppress motor signals
         thalamus.suppress(SignalType::Motor);
 
-        let motor = BrainSignal::new("test", SignalType::Motor, "move")
-            .with_salience(0.9);
+        let motor = BrainSignal::new("test", SignalType::Motor, "move").with_salience(0.9);
 
         if let GateResult::Filtered { reason, .. } = thalamus.gate(motor) {
             assert_eq!(reason, FilterReason::Suppressed);
@@ -462,8 +464,7 @@ mod tests {
         let thalamus = Thalamus::new();
 
         // Sensory signal should go to amygdala
-        let sensory = BrainSignal::new("test", SignalType::Sensory, "input")
-            .with_salience(0.5);
+        let sensory = BrainSignal::new("test", SignalType::Sensory, "input").with_salience(0.5);
         let routed = thalamus.route(&sensory);
         assert!(routed.destinations.contains(&Destination::Amygdala));
 

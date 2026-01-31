@@ -11,9 +11,9 @@
 
 use crate::error::Result;
 use crate::signal::{BrainSignal, SignalType};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 /// A prediction about future state.
@@ -139,14 +139,14 @@ impl PredictionEngine {
         error_magnitude: f64,
     ) -> Result<PredictionError> {
         let prediction = self.predictions.remove(&prediction_id);
-        
+
         let error_magnitude = error_magnitude.clamp(0.0, 1.0);
-        
+
         // Surprise is weighted by prediction confidence
         // High confidence + high error = very surprising
         let confidence = prediction.as_ref().map(|p| p.confidence).unwrap_or(0.5);
         let surprise = error_magnitude * confidence;
-        
+
         let error = PredictionError {
             prediction_id,
             actual: serde_json::to_value(actual).unwrap_or(serde_json::Value::Null),
@@ -155,16 +155,16 @@ impl PredictionEngine {
             surprise,
             computed_at: Utc::now(),
         };
-        
+
         // Update rolling average
         self.update_rolling_error(error_magnitude);
-        
+
         // Store in history (keep last 1000)
         self.error_history.push(error.clone());
         if self.error_history.len() > 1000 {
             self.error_history.remove(0);
         }
-        
+
         Ok(error)
     }
 
@@ -201,29 +201,26 @@ impl PredictionEngine {
     pub fn clear_expired(&mut self) -> usize {
         let now = Utc::now();
         let before = self.predictions.len();
-        
-        self.predictions.retain(|_, p| {
-            p.valid_until.map(|t| t > now).unwrap_or(true)
-        });
-        
+
+        self.predictions
+            .retain(|_, p| p.valid_until.map(|t| t > now).unwrap_or(true));
+
         before - self.predictions.len()
     }
 
     /// Get statistics about prediction performance.
     pub fn stats(&self) -> PredictionStats {
-        let recent_errors: Vec<_> = self.error_history.iter()
-            .rev()
-            .take(100)
-            .collect();
-        
+        let recent_errors: Vec<_> = self.error_history.iter().rev().take(100).collect();
+
         let avg_error = if recent_errors.is_empty() {
             0.0
         } else {
-            recent_errors.iter().map(|e| e.error_magnitude).sum::<f64>() / recent_errors.len() as f64
+            recent_errors.iter().map(|e| e.error_magnitude).sum::<f64>()
+                / recent_errors.len() as f64
         };
-        
+
         let surprise_count = recent_errors.iter().filter(|e| e.is_surprising()).count();
-        
+
         PredictionStats {
             active_predictions: self.predictions.len(),
             total_evaluations: self.error_history.len(),
@@ -267,14 +264,14 @@ mod tests {
     #[test]
     fn test_prediction_evaluation() {
         let mut engine = PredictionEngine::new();
-        
+
         // Make a confident prediction
         let pred = Prediction::new("test", "value", 100, 0.95);
         let pred_id = engine.predict(pred);
-        
+
         // Evaluate with high error
         let error = engine.evaluate(pred_id, 50, 0.8).unwrap();
-        
+
         // High confidence + high error = high surprise
         assert!(error.surprise > 0.7);
         assert!(error.is_surprising());
@@ -284,14 +281,14 @@ mod tests {
     fn test_learning_rate_modulation() {
         let mut engine = PredictionEngine::new();
         let initial_rate = engine.current_learning_rate();
-        
+
         // Generate many high errors
         for _ in 0..10 {
             let pred = Prediction::new("test", "value", 100, 0.9);
             let id = engine.predict(pred);
             engine.evaluate(id, 0, 0.9).unwrap();
         }
-        
+
         // Learning rate should have increased
         assert!(engine.current_learning_rate() > initial_rate);
     }
@@ -300,14 +297,14 @@ mod tests {
     fn test_adaptation_state() {
         let mut engine = PredictionEngine::new();
         assert!(!engine.is_adapting());
-        
+
         // Generate errors
         for _ in 0..20 {
             let pred = Prediction::new("test", "value", 100, 0.9);
             let id = engine.predict(pred);
             engine.evaluate(id, 0, 0.8).unwrap();
         }
-        
+
         assert!(engine.is_adapting());
     }
 }

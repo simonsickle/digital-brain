@@ -3,5 +3,5 @@
 pub mod prediction;
 pub mod workspace;
 
-pub use prediction::{PredictionEngine, Prediction, PredictionError, PredictionStats};
-pub use workspace::{GlobalWorkspace, WorkspaceConfig, Broadcast};
+pub use prediction::{Prediction, PredictionEngine, PredictionError, PredictionStats};
+pub use workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};

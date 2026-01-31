@@ -183,7 +183,11 @@ pub struct BrainSignal {
 
 impl BrainSignal {
     /// Create a new brain signal.
-    pub fn new(source: impl Into<String>, signal_type: SignalType, content: impl Serialize) -> Self {
+    pub fn new(
+        source: impl Into<String>,
+        signal_type: SignalType,
+        content: impl Serialize,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
             source: source.into(),
@@ -248,10 +252,9 @@ impl BrainSignal {
         escalated.salience = self.salience.boost(boost);
         escalated.arousal = Arousal::new(self.arousal.value() + boost / 2.0);
         escalated.priority += 1;
-        escalated.metadata.insert(
-            "escalated".to_string(),
-            serde_json::Value::Bool(true),
-        );
+        escalated
+            .metadata
+            .insert("escalated".to_string(), serde_json::Value::Bool(true));
         escalated
     }
 }
@@ -392,8 +395,7 @@ mod tests {
 
     #[test]
     fn test_memory_decay() {
-        let signal = BrainSignal::new("test", SignalType::Memory, "test memory")
-            .with_valence(0.0); // Neutral valence = normal decay
+        let signal = BrainSignal::new("test", SignalType::Memory, "test memory").with_valence(0.0); // Neutral valence = normal decay
 
         let mut memory = MemoryTrace::from_signal(&signal);
         assert_eq!(memory.strength, 1.0);
@@ -405,10 +407,10 @@ mod tests {
 
     #[test]
     fn test_emotional_memory_decay_slower() {
-        let neutral_signal = BrainSignal::new("test", SignalType::Memory, "neutral")
-            .with_valence(0.0);
-        let emotional_signal = BrainSignal::new("test", SignalType::Memory, "emotional")
-            .with_valence(0.9);
+        let neutral_signal =
+            BrainSignal::new("test", SignalType::Memory, "neutral").with_valence(0.0);
+        let emotional_signal =
+            BrainSignal::new("test", SignalType::Memory, "emotional").with_valence(0.9);
 
         let mut neutral_memory = MemoryTrace::from_signal(&neutral_signal);
         let mut emotional_memory = MemoryTrace::from_signal(&emotional_signal);

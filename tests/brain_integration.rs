@@ -2,11 +2,11 @@
 //!
 //! Tests the complete flow: signal → amygdala → workspace → hippocampus
 
-use digital_brain::prelude::*;
-use digital_brain::regions::hippocampus::HippocampusStore;
-use digital_brain::regions::amygdala::Amygdala;
-use digital_brain::core::prediction::{PredictionEngine, Prediction};
+use digital_brain::core::prediction::{Prediction, PredictionEngine};
 use digital_brain::core::workspace::{GlobalWorkspace, WorkspaceConfig};
+use digital_brain::prelude::*;
+use digital_brain::regions::amygdala::Amygdala;
+use digital_brain::regions::hippocampus::HippocampusStore;
 
 /// Test the complete cognitive cycle.
 #[test]
@@ -19,7 +19,7 @@ fn test_complete_cognitive_cycle() {
         ..Default::default()
     });
     let hippocampus = HippocampusStore::new_in_memory().unwrap();
-    let mut prediction_engine = PredictionEngine::new();
+    let _prediction_engine = PredictionEngine::new();
 
     // Register modules with workspace
     workspace.register_module("hippocampus");
@@ -57,9 +57,10 @@ fn test_complete_cognitive_cycle() {
 
     // Verify emotional signals won the competition
     assert!(!broadcasts.is_empty());
-    
+
     // The danger signal should have high salience
-    let danger_broadcast = broadcasts.iter()
+    let danger_broadcast = broadcasts
+        .iter()
         .find(|b| b.signal.content.to_string().contains("DANGER"));
     assert!(danger_broadcast.is_some());
 
@@ -170,7 +171,7 @@ fn test_emotional_state_dynamics() {
     }
 
     let (v2, a2) = amygdala.current_state();
-    
+
     // Should have decayed toward neutral
     assert!(v2.intensity() < v1.intensity());
     assert!((a2.value() - 0.5).abs() < (a1.value() - 0.5).abs());
@@ -230,6 +231,10 @@ fn test_surprise_strengthens_memory() {
     let surprising_mem = hippocampus.get(surprising_id).unwrap();
     let expected_mem = hippocampus.get(expected_id).unwrap();
 
-    assert!(surprising_mem.strength > expected_mem.strength,
-        "Surprising: {}, Expected: {}", surprising_mem.strength, expected_mem.strength);
+    assert!(
+        surprising_mem.strength > expected_mem.strength,
+        "Surprising: {}, Expected: {}",
+        surprising_mem.strength,
+        expected_mem.strength
+    );
 }

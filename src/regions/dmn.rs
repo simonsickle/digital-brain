@@ -53,11 +53,11 @@ pub struct Belief {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BeliefCategory {
-    SelfCapability,    // "I can do X"
-    SelfPreference,    // "I prefer X"
-    SelfIdentity,      // "I am X"
-    WorldModel,        // "The world works like X"
-    OtherModel,        // "Agent X tends to do Y"
+    SelfCapability, // "I can do X"
+    SelfPreference, // "I prefer X"
+    SelfIdentity,   // "I am X"
+    WorldModel,     // "The world works like X"
+    OtherModel,     // "Agent X tends to do Y"
 }
 
 impl Belief {
@@ -105,12 +105,12 @@ pub struct Reflection {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReflectionTrigger {
-    Scheduled,     // Regular self-check
-    Success,       // After accomplishing something
-    Failure,       // After failing
-    Surprise,      // Unexpected outcome
-    Emotional,     // Strong emotion triggered
-    Query,         // Asked to reflect
+    Scheduled, // Regular self-check
+    Success,   // After accomplishing something
+    Failure,   // After failing
+    Surprise,  // Unexpected outcome
+    Emotional, // Strong emotion triggered
+    Query,     // Asked to reflect
 }
 
 /// Narrative entry in the agent's autobiographical stream.
@@ -150,7 +150,7 @@ impl AgentModel {
     pub fn record_interaction(&mut self, positive: bool) {
         self.interaction_count += 1;
         self.last_interaction = Utc::now();
-        
+
         if positive {
             self.trust_level = (self.trust_level + 0.05).min(1.0);
         } else {
@@ -159,7 +159,8 @@ impl AgentModel {
     }
 
     pub fn set_trait(&mut self, trait_name: impl Into<String>, strength: f64) {
-        self.traits.insert(trait_name.into(), strength.clamp(0.0, 1.0));
+        self.traits
+            .insert(trait_name.into(), strength.clamp(0.0, 1.0));
     }
 }
 
@@ -267,7 +268,10 @@ impl DefaultModeNetwork {
                 format!(
                     "Checking in: emotional state is {:.1}, {} beliefs held.",
                     self.estimated_emotional_state,
-                    self.beliefs.iter().filter(|b| b.is_held(self.config.belief_threshold)).count()
+                    self.beliefs
+                        .iter()
+                        .filter(|b| b.is_held(self.config.belief_threshold))
+                        .count()
                 )
             }
             ReflectionTrigger::Success => {
@@ -296,10 +300,7 @@ impl DefaultModeNetwork {
                 )
             }
             ReflectionTrigger::Query => {
-                format!(
-                    "Reflecting on: {}",
-                    context.unwrap_or("my current state")
-                )
+                format!("Reflecting on: {}", context.unwrap_or("my current state"))
             }
         };
 
@@ -343,8 +344,7 @@ impl DefaultModeNetwork {
     /// Update emotional state estimate.
     pub fn update_emotional_state(&mut self, new_valence: f64) {
         // Exponential moving average
-        self.estimated_emotional_state = 
-            0.3 * new_valence + 0.7 * self.estimated_emotional_state;
+        self.estimated_emotional_state = 0.3 * new_valence + 0.7 * self.estimated_emotional_state;
     }
 
     /// Get or create a model of another agent.
@@ -359,7 +359,10 @@ impl DefaultModeNetwork {
         self.cycle_count += 1;
 
         // Scheduled reflection
-        if self.cycle_count % self.config.reflection_interval as u64 == 0 {
+        if self
+            .cycle_count
+            .is_multiple_of(self.config.reflection_interval as u64)
+        {
             Some(self.reflect(ReflectionTrigger::Scheduled, None))
         } else {
             None
@@ -373,7 +376,10 @@ impl DefaultModeNetwork {
             self.identity.name,
             self.identity.self_description,
             self.identity.core_values.join(", "),
-            self.beliefs.iter().filter(|b| b.is_held(self.config.belief_threshold)).count()
+            self.beliefs
+                .iter()
+                .filter(|b| b.is_held(self.config.belief_threshold))
+                .count()
         )
     }
 
@@ -381,7 +387,11 @@ impl DefaultModeNetwork {
     pub fn stats(&self) -> DmnStats {
         DmnStats {
             total_beliefs: self.beliefs.len(),
-            active_beliefs: self.beliefs.iter().filter(|b| b.is_held(self.config.belief_threshold)).count(),
+            active_beliefs: self
+                .beliefs
+                .iter()
+                .filter(|b| b.is_held(self.config.belief_threshold))
+                .count(),
             reflections: self.reflections.len(),
             narrative_entries: self.narrative.len(),
             known_agents: self.other_models.len(),

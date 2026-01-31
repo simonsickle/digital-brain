@@ -10,7 +10,7 @@
 //! - Emotional memory tagging
 
 #[allow(unused_imports)]
-use crate::signal::{BrainSignal, SignalType, Valence, Arousal};
+use crate::signal::{Arousal, BrainSignal, SignalType, Valence};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -125,7 +125,7 @@ impl Amygdala {
     /// Default emotional associations (can be learned/modified).
     fn default_associations() -> HashMap<String, f64> {
         let mut map = HashMap::new();
-        
+
         // Positive associations
         map.insert("success".to_string(), 0.8);
         map.insert("win".to_string(), 0.7);
@@ -135,7 +135,7 @@ impl Amygdala {
         map.insert("great".to_string(), 0.7);
         map.insert("excellent".to_string(), 0.8);
         map.insert("beautiful".to_string(), 0.6);
-        
+
         // Negative associations
         map.insert("fail".to_string(), -0.7);
         map.insert("error".to_string(), -0.5);
@@ -145,23 +145,23 @@ impl Amygdala {
         map.insert("threat".to_string(), -0.9);
         map.insert("pain".to_string(), -0.7);
         map.insert("loss".to_string(), -0.6);
-        
+
         map
     }
 
     /// Process a signal and compute emotional appraisal.
     pub fn appraise(&mut self, signal: &BrainSignal) -> EmotionalAppraisal {
         self.processed_count += 1;
-        
+
         // Extract content for analysis
         let content_str = signal.content.to_string().to_lowercase();
-        
+
         // Compute valence from content
         let content_valence = self.compute_content_valence(&content_str);
-        
+
         // Compute arousal from signal properties
         let arousal_value = self.compute_arousal(signal);
-        
+
         // Combine with any existing valence on the signal
         let combined_valence = if signal.valence.value().abs() > 0.1 {
             // Signal already has valence - weight it heavily
@@ -169,27 +169,27 @@ impl Amygdala {
         } else {
             content_valence
         };
-        
+
         // Apply threat bias (negative emotions weighted more)
         let biased_valence = if combined_valence < 0.0 {
             combined_valence * self.config.threat_bias
         } else {
             combined_valence
         };
-        
+
         let valence = Valence::new(biased_valence);
         let arousal = Arousal::new(arousal_value);
-        
+
         // Update running emotional state
         self.update_emotional_state(valence.value(), arousal.value());
-        
+
         // Determine if significant
         let intensity = valence.intensity() * arousal.value();
         let is_significant = intensity > self.config.significance_threshold;
-        
+
         // Detect primary emotion
         let primary_emotion = self.detect_emotion(valence.value(), arousal.value());
-        
+
         EmotionalAppraisal {
             valence,
             arousal,
@@ -203,14 +203,14 @@ impl Amygdala {
     fn compute_content_valence(&self, content: &str) -> f64 {
         let mut valence_sum = 0.0;
         let mut match_count = 0;
-        
+
         for (keyword, valence) in &self.learned_associations {
             if content.contains(keyword) {
                 valence_sum += valence;
                 match_count += 1;
             }
         }
-        
+
         if match_count > 0 {
             (valence_sum / match_count as f64).clamp(-1.0, 1.0)
         } else {
@@ -221,22 +221,22 @@ impl Amygdala {
     /// Compute arousal from signal properties.
     fn compute_arousal(&self, signal: &BrainSignal) -> f64 {
         let mut arousal = signal.arousal.value();
-        
+
         // High salience increases arousal
         if signal.salience.is_high() {
             arousal += 0.2;
         }
-        
+
         // Surprising signals increase arousal
         if signal.is_surprising() {
             arousal += 0.3;
         }
-        
+
         // High priority increases arousal
         if signal.priority > 0 {
             arousal += 0.1 * (signal.priority as f64).min(3.0);
         }
-        
+
         arousal.clamp(0.0, 1.0)
     }
 
@@ -254,49 +254,66 @@ impl Amygdala {
         if valence.abs() < 0.2 && arousal < 0.3 {
             return None; // Neutral
         }
-        
+
         Some(match (valence >= 0.0, arousal > 0.5) {
             (true, true) => {
-                if valence > 0.6 { Emotion::Joy } else { Emotion::Anticipation }
+                if valence > 0.6 {
+                    Emotion::Joy
+                } else {
+                    Emotion::Anticipation
+                }
             }
             (true, false) => {
-                if valence > 0.4 { Emotion::Trust } else { Emotion::Anticipation }
+                if valence > 0.4 {
+                    Emotion::Trust
+                } else {
+                    Emotion::Anticipation
+                }
             }
             (false, true) => {
-                if valence < -0.6 { Emotion::Fear } else { Emotion::Anger }
+                if valence < -0.6 {
+                    Emotion::Fear
+                } else {
+                    Emotion::Anger
+                }
             }
-            (false, false) => {
-                Emotion::Sadness
-            }
+            (false, false) => Emotion::Sadness,
         })
     }
 
     /// Learn a new emotional association.
     pub fn learn_association(&mut self, keyword: impl Into<String>, valence: f64) {
-        self.learned_associations.insert(keyword.into(), valence.clamp(-1.0, 1.0));
+        self.learned_associations
+            .insert(keyword.into(), valence.clamp(-1.0, 1.0));
     }
 
     /// Get current emotional state.
     pub fn current_state(&self) -> (Valence, Arousal) {
-        (Valence::new(self.current_valence), Arousal::new(self.current_arousal))
+        (
+            Valence::new(self.current_valence),
+            Arousal::new(self.current_arousal),
+        )
     }
 
     /// Apply emotional decay (call periodically).
     pub fn decay(&mut self) {
         self.current_valence *= 1.0 - self.config.emotional_decay_rate;
-        self.current_arousal = self.current_arousal * (1.0 - self.config.emotional_decay_rate) 
+        self.current_arousal = self.current_arousal * (1.0 - self.config.emotional_decay_rate)
             + 0.5 * self.config.emotional_decay_rate; // Decay toward baseline
     }
 
     /// Tag a signal with emotional appraisal.
     pub fn tag_signal(&mut self, signal: BrainSignal) -> BrainSignal {
         let appraisal = self.appraise(&signal);
-        
+
         signal
             .with_valence(appraisal.valence.value())
             .with_arousal(appraisal.arousal.value())
             .with_metadata("emotional_significance", appraisal.is_significant)
-            .with_metadata("primary_emotion", appraisal.primary_emotion.map(|e| format!("{:?}", e)))
+            .with_metadata(
+                "primary_emotion",
+                appraisal.primary_emotion.map(|e| format!("{:?}", e)),
+            )
     }
 
     /// Get statistics about emotional processing.
@@ -332,34 +349,38 @@ mod tests {
     #[test]
     fn test_positive_content_detection() {
         let mut amygdala = Amygdala::new();
-        
+
         let signal = BrainSignal::new("test", SignalType::Sensory, "This is a great success!");
         let appraisal = amygdala.appraise(&signal);
-        
+
         assert!(appraisal.valence.is_positive());
     }
 
     #[test]
     fn test_negative_content_detection() {
         let mut amygdala = Amygdala::new();
-        
-        let signal = BrainSignal::new("test", SignalType::Sensory, "Terrible failure, danger ahead");
+
+        let signal = BrainSignal::new(
+            "test",
+            SignalType::Sensory,
+            "Terrible failure, danger ahead",
+        );
         let appraisal = amygdala.appraise(&signal);
-        
+
         assert!(appraisal.valence.is_negative());
     }
 
     #[test]
     fn test_threat_bias() {
         let mut amygdala = Amygdala::new();
-        
+
         // Process positive and negative signals
         let positive = BrainSignal::new("test", SignalType::Sensory, "good things");
         let negative = BrainSignal::new("test", SignalType::Sensory, "bad things");
-        
+
         let pos_appraisal = amygdala.appraise(&positive);
         let neg_appraisal = amygdala.appraise(&negative);
-        
+
         // Negative should have stronger absolute value due to threat bias
         assert!(neg_appraisal.valence.intensity() >= pos_appraisal.valence.intensity() * 0.9);
     }
@@ -367,35 +388,35 @@ mod tests {
     #[test]
     fn test_emotion_detection() {
         let mut amygdala = Amygdala::new();
-        
+
         // High positive valence + high arousal = joy
-        let signal = BrainSignal::new("test", SignalType::Sensory, "love and happiness!")
-            .with_arousal(0.8);
+        let signal =
+            BrainSignal::new("test", SignalType::Sensory, "love and happiness!").with_arousal(0.8);
         let appraisal = amygdala.appraise(&signal);
-        
+
         assert_eq!(appraisal.primary_emotion, Some(Emotion::Joy));
     }
 
     #[test]
     fn test_learned_association() {
         let mut amygdala = Amygdala::new();
-        
+
         // Learn a new association
         amygdala.learn_association("rust", 0.9);
-        
+
         let signal = BrainSignal::new("test", SignalType::Sensory, "I love rust programming");
         let appraisal = amygdala.appraise(&signal);
-        
+
         assert!(appraisal.valence.is_positive());
     }
 
     #[test]
     fn test_signal_tagging() {
         let mut amygdala = Amygdala::new();
-        
+
         let signal = BrainSignal::new("test", SignalType::Sensory, "great news!");
         let tagged = amygdala.tag_signal(signal);
-        
+
         assert!(tagged.valence.is_positive());
         assert!(tagged.metadata.contains_key("emotional_significance"));
     }
@@ -403,20 +424,20 @@ mod tests {
     #[test]
     fn test_emotional_decay() {
         let mut amygdala = Amygdala::new();
-        
+
         // Process high-valence signal
         let signal = BrainSignal::new("test", SignalType::Sensory, "amazing success!");
         amygdala.appraise(&signal);
-        
+
         let (initial_v, _) = amygdala.current_state();
-        
+
         // Apply decay
         for _ in 0..10 {
             amygdala.decay();
         }
-        
+
         let (decayed_v, _) = amygdala.current_state();
-        
+
         // Valence should have decayed toward neutral
         assert!(decayed_v.intensity() < initial_v.intensity());
     }

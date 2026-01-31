@@ -10,7 +10,7 @@ use crate::error::{BrainError, Result};
 #[allow(unused_imports)]
 use crate::signal::{BrainSignal, MemoryTrace, SignalType};
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde_json;
 use uuid::Uuid;
 
@@ -171,7 +171,9 @@ impl HippocampusStore {
         )?;
 
         let memories = stmt
-            .query_map(params![pattern, limit as i64], |row| self.row_to_memory(row))?
+            .query_map(params![pattern, limit as i64], |row| {
+                self.row_to_memory(row)
+            })?
             .filter_map(|r| r.ok())
             .collect();
 
@@ -180,9 +182,7 @@ impl HippocampusStore {
 
     /// Get a specific memory by ID.
     pub fn get(&self, id: Uuid) -> Result<MemoryTrace> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT * FROM memories WHERE id = ?1")?;
+        let mut stmt = self.conn.prepare("SELECT * FROM memories WHERE id = ?1")?;
 
         stmt.query_row(params![id.to_string()], |row| self.row_to_memory(row))
             .map_err(|_| BrainError::MemoryNotFound(id.to_string()))
@@ -363,13 +363,11 @@ mod tests {
         let store = HippocampusStore::new_in_memory()?;
 
         // Encode neutral memory first
-        let neutral = BrainSignal::new("test", SignalType::Memory, "neutral")
-            .with_valence(0.0);
+        let neutral = BrainSignal::new("test", SignalType::Memory, "neutral").with_valence(0.0);
         store.encode(&neutral)?;
 
         // Encode emotional memory second
-        let emotional = BrainSignal::new("test", SignalType::Memory, "emotional")
-            .with_valence(0.9);
+        let emotional = BrainSignal::new("test", SignalType::Memory, "emotional").with_valence(0.9);
         let emotional_memory = store.encode(&emotional)?;
 
         // Retrieve with valence boost
