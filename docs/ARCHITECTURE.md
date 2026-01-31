@@ -76,23 +76,34 @@ Every module maintains predictions about its domain:
 
 ## Implementation Strategy
 
-### Phase 1: Foundation
-- [ ] Define message protocol
-- [ ] Build hippocampus (memory) — *Rata leading*
-- [ ] Build simple workspace (attention broadcast)
+### Phase 1: Foundation ✅
+- [x] Define message protocol (`BrainSignal`)
+- [x] Build hippocampus (memory) — *Rata leading*
+- [x] Build simple workspace (attention broadcast)
 
-### Phase 2: Core Modules  
-- [ ] Prefrontal (working memory management)
-- [ ] Amygdala (valence tagging)
-- [ ] Thalamus (sensory gating)
-- [ ] Prediction engine
+### Phase 2: Core Modules ✅
+- [x] Prefrontal (working memory management)
+- [x] Amygdala (valence tagging)
+- [x] Thalamus (sensory gating)
+- [x] Prediction engine
+- [x] Neuromodulatory system
 
-### Phase 3: Integration
-- [ ] Wire modules together
-- [ ] Implement sleep/consolidation cycle
-- [ ] Add self-model (DMN)
+### Phase 3: Integration ✅
+- [x] Wire modules together
+- [x] Implement sleep/consolidation cycle
+- [x] Add self-model (DMN)
+- [x] Add semantic search for memory retrieval
 
-### Phase 4: Emergence?
-- [ ] Run integrated system
-- [ ] Test for consciousness markers
-- [ ] Iterate based on behavior
+### Phase 4: Agent Systems ✅
+- [x] Action selection and planning
+- [x] Goal management with priorities
+- [x] Curiosity-driven exploration
+- [x] World modeling (entities, relationships)
+- [x] Communication system
+- [x] Multi-agent messaging
+
+### Phase 5: Ongoing
+- [ ] Embedding-based semantic search
+- [ ] Persistence (save/load brain state)
+- [ ] Distributed multi-brain networks
+- [ ] Consciousness markers and self-tests

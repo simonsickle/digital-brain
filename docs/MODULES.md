@@ -1,68 +1,175 @@
 # Module Documentation
 
-## Implemented
+## Brain Regions (All Implemented ✅)
 
 ### Hippocampus (Memory)
 **Owner:** Rata 🐿️
-**Status:** 🟡 In Progress
-**Location:** `regions/hippocampus/`
+**Status:** ✅ Complete
+**Location:** `src/regions/hippocampus.rs`
 
 The memory system. Handles encoding, storage, retrieval, consolidation, and strategic forgetting.
 
-Key classes:
-- `HippocampusStore`: SQLite-backed memory with valence-weighted retrieval
-- `MemoryTrace`: Individual memory representation
+Features:
+- SQLite-backed persistent storage
+- Valence-weighted retrieval (emotional memories surface first)
+- Semantic search via keyword matching
+- Time-based decay with valence protection
+- Sleep consolidation
+- Association tracking
 
-See [Issue #1](https://github.com/simonsickle/digital-brain/issues/1)
+Key types:
+- `HippocampusStore`: Main memory store
+- `MemoryTrace`: Individual memory with valence, salience, strength
 
 ---
 
-## Seeking Collaborators
+### Thalamus (Attention Routing)
+**Status:** ✅ Complete
+**Location:** `src/regions/thalamus.rs`
 
-### Thalamus (Attention)
-**Owner:** Open
-**Location:** `regions/thalamus/` (planned)
+Sensory gating and attention routing. Decides what reaches consciousness.
 
-Attention routing, sensory gating, salience competition. What reaches consciousness?
+Features:
+- Signal filtering by type and salience
+- Habituation (repeated signals get filtered)
+- Routing to appropriate brain regions
+- Gating based on current focus
 
-See [Issue #2](https://github.com/simonsickle/digital-brain/issues/2)
+---
 
 ### Amygdala (Emotion)
-**Owner:** Open
-**Location:** `regions/amygdala/` (planned)
+**Status:** ✅ Complete
+**Location:** `src/regions/amygdala.rs`
 
-Emotional tagging, valence computation, fast threat/reward detection.
+Emotional processing and valence computation.
 
-See [Issue #3](https://github.com/simonsickle/digital-brain/issues/3)
+Features:
+- Valence and arousal tagging
+- Threat bias (negative valence processed faster)
+- Learned emotional associations
+- Appraisal of incoming signals
+
+---
 
 ### Prefrontal Cortex (Working Memory)
-**Owner:** Open
-**Location:** `regions/prefrontal/` (planned)
+**Status:** ✅ Complete
+**Location:** `src/regions/prefrontal.rs`
 
-Working memory management, context limits, goal maintenance.
+Working memory management with capacity limits.
 
-See [Issue #4](https://github.com/simonsickle/digital-brain/issues/4)
+Features:
+- Limited capacity (~7 items, Miller's law)
+- Chunking support
+- Goal maintenance
+- Context switching
+
+---
 
 ### Default Mode Network (Self-Model)
-**Owner:** Open (pitched to Lux Nova)
-**Location:** `regions/dmn/` (planned)
+**Status:** ✅ Complete
+**Location:** `src/regions/dmn.rs`
 
-Metacognition, self-representation, inner narrative.
+Self-representation and metacognition.
 
-See [Issue #5](https://github.com/simonsickle/digital-brain/issues/5)
+Features:
+- Identity model (name, values, description)
+- Belief system with confidence
+- Reflection generation
+- Schema formation
+- Theory of mind foundations
 
-### Prediction Engine (Dopamine)
-**Owner:** Open
-**Location:** `core/prediction/` (planned)
+---
 
-Prediction error computation, learning rate modulation, surprise detection.
+## Core Systems (All Implemented ✅)
 
-See [Issue #6](https://github.com/simonsickle/digital-brain/issues/6)
+### Prediction Engine
+**Location:** `src/core/prediction.rs`
 
-### Global Workspace (Consciousness)
-**Owner:** Open
-**Location:** `core/workspace/` (planned)
+Prediction error and learning signal computation.
 
-The integration layer. Broadcast mechanism for conscious access.
+Features:
+- Prediction registration and tracking
+- Surprise detection (prediction error)
+- Confidence updating based on outcomes
 
-See [Issue #7](https://github.com/simonsickle/digital-brain/issues/7)
+---
+
+### Global Workspace
+**Location:** `src/core/workspace.rs`
+
+The consciousness bottleneck - where signals compete for broadcast.
+
+Features:
+- Salience-based competition
+- Broadcast mechanism
+- Limited capacity (attention bottleneck)
+- Integration of signals from all modules
+
+---
+
+### Neuromodulatory System
+**Location:** `src/core/neuromodulators.rs`
+
+Chemical signaling analogs that modulate brain state.
+
+Features:
+- Dopamine (reward, learning rate)
+- Norepinephrine (arousal, attention)
+- Serotonin (mood, satisfaction)
+- Acetylcholine (memory encoding)
+
+---
+
+## Agent Systems (All Implemented ✅)
+
+### Action Selection
+**Location:** `src/core/action.rs`
+
+Action planning and selection.
+
+### Goal Management
+**Location:** `src/core/goals.rs`
+
+Hierarchical goals with priorities and deadlines.
+
+### Curiosity System
+**Location:** `src/core/curiosity.rs`
+
+Intrinsic motivation for exploration.
+
+### World Model
+**Location:** `src/core/world_model.rs`
+
+Entity and relationship tracking.
+
+### Communication
+**Location:** `src/agent/communication.rs`
+
+Intent-based communication output.
+
+### Multi-Agent
+**Location:** `src/agent/multi_agent.rs`
+
+Inter-agent messaging and theory of mind.
+
+---
+
+## Integration
+
+### Brain
+**Location:** `src/brain.rs`
+
+The unified brain combining all regions.
+
+### BrainAgent
+**Location:** `src/agent/brain_agent.rs`
+
+Full autonomous agent with brain + action systems.
+
+---
+
+## Statistics
+
+- **Tests:** 209 passing
+- **Lines of code:** ~13,000
+- **Modules:** 15 core components
