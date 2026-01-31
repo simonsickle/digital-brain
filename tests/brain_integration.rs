@@ -111,7 +111,7 @@ fn test_emotional_learning() {
     let mut amygdala = Amygdala::new();
 
     // Initially, "clippy" has no emotional association
-    let signal1 = BrainSignal::new("test", SignalType::Sensory, "clippy lint warnings");
+    let signal1 = BrainSignal::new("test", SignalType::Sensory, "clippy lint output");
     let appraisal1 = amygdala.appraise(&signal1);
     assert!(appraisal1.valence.intensity() < 0.3); // Neutral
 

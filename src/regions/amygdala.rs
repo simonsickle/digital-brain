@@ -126,25 +126,73 @@ impl Amygdala {
     fn default_associations() -> HashMap<String, f64> {
         let mut map = HashMap::new();
 
-        // Positive associations
+        // Positive associations - achievements and success
         map.insert("success".to_string(), 0.8);
         map.insert("win".to_string(), 0.7);
+        map.insert("won".to_string(), 0.7);
+        map.insert("victory".to_string(), 0.8);
+        map.insert("solved".to_string(), 0.7);
+        map.insert("fixed".to_string(), 0.6);
+        map.insert("achieved".to_string(), 0.7);
+        map.insert("breakthrough".to_string(), 0.9);
+        map.insert("discovered".to_string(), 0.7);
+        map.insert("completed".to_string(), 0.6);
+
+        // Positive associations - emotions
         map.insert("happy".to_string(), 0.8);
         map.insert("love".to_string(), 0.9);
+        map.insert("joy".to_string(), 0.8);
+        map.insert("excited".to_string(), 0.7);
+        map.insert("thrilled".to_string(), 0.8);
+        map.insert("proud".to_string(), 0.7);
+        map.insert("grateful".to_string(), 0.7);
+        map.insert("relief".to_string(), 0.6);
+        map.insert("satisfied".to_string(), 0.6);
+
+        // Positive associations - quality
         map.insert("good".to_string(), 0.5);
         map.insert("great".to_string(), 0.7);
         map.insert("excellent".to_string(), 0.8);
         map.insert("beautiful".to_string(), 0.6);
+        map.insert("amazing".to_string(), 0.8);
+        map.insert("wonderful".to_string(), 0.8);
+        map.insert("fantastic".to_string(), 0.8);
+        map.insert("brilliant".to_string(), 0.7);
+        map.insert("perfect".to_string(), 0.7);
+        map.insert("awesome".to_string(), 0.7);
+        map.insert("incredible".to_string(), 0.8);
+        map.insert("fascinating".to_string(), 0.6);
+        map.insert("interesting".to_string(), 0.4);
 
-        // Negative associations
+        // Negative associations - failure
         map.insert("fail".to_string(), -0.7);
+        map.insert("failed".to_string(), -0.7);
+        map.insert("failure".to_string(), -0.7);
         map.insert("error".to_string(), -0.5);
+        map.insert("bug".to_string(), -0.4);
+        map.insert("broken".to_string(), -0.5);
+        map.insert("crash".to_string(), -0.6);
+
+        // Negative associations - emotions
         map.insert("bad".to_string(), -0.5);
         map.insert("terrible".to_string(), -0.8);
+        map.insert("awful".to_string(), -0.7);
+        map.insert("horrible".to_string(), -0.8);
+        map.insert("sad".to_string(), -0.6);
+        map.insert("angry".to_string(), -0.6);
+        map.insert("frustrated".to_string(), -0.5);
+        map.insert("worried".to_string(), -0.4);
+        map.insert("anxious".to_string(), -0.5);
+
+        // Negative associations - threat/danger
         map.insert("danger".to_string(), -0.8);
         map.insert("threat".to_string(), -0.9);
+        map.insert("warning".to_string(), -0.6);
+        map.insert("critical".to_string(), -0.7);
+        map.insert("urgent".to_string(), -0.5);
         map.insert("pain".to_string(), -0.7);
         map.insert("loss".to_string(), -0.6);
+        map.insert("lost".to_string(), -0.5);
 
         map
     }
