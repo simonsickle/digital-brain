@@ -163,6 +163,41 @@ fn main() {
         let _ = agent.goals().get_active_goal(&state);
     });
 
+    // Memory Benchmarks
+    println!("\n─── Memory (Hippocampus) ─────────────────────────────────────");
+
+    use digital_brain::prelude::*;
+    use digital_brain::regions::hippocampus::HippocampusStore;
+
+    let hippocampus = HippocampusStore::new_in_memory().unwrap();
+
+    // Encode some memories first for retrieval benchmarks
+    for i in 0..100 {
+        let signal = BrainSignal::new("bench", SignalType::Memory, &format!("Memory content {} with Tesla API and various keywords", i))
+            .with_valence(if i % 2 == 0 { 0.5 } else { -0.3 })
+            .with_salience(0.5);
+        hippocampus.encode(&signal).unwrap();
+    }
+
+    bench("Memory encode", 1_000, || {
+        let signal = BrainSignal::new("bench", SignalType::Memory, "Benchmark memory encoding test")
+            .with_valence(0.5)
+            .with_salience(0.6);
+        let _ = hippocampus.encode(&signal);
+    });
+
+    bench("Memory retrieve (valence boost)", 1_000, || {
+        let _ = hippocampus.retrieve(10, true);
+    });
+
+    bench("Memory semantic search", 1_000, || {
+        let _ = hippocampus.retrieve_by_query("Tesla API keywords", 10);
+    });
+
+    bench("Memory decay (simulated 1h)", 100, || {
+        let _ = hippocampus.decay_all(1.0);
+    });
+
     // BrainAgent Benchmarks (if enabled)
     println!("\n─── BrainAgent ───────────────────────────────────────────────");
 
