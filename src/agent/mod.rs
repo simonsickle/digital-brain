@@ -9,6 +9,7 @@
 //! - MultiAgentSystem (inter-agent communication and theory of mind)
 
 pub mod agent_loop;
+pub mod brain_agent;
 pub mod communication;
 pub mod multi_agent;
 
@@ -23,3 +24,4 @@ pub use multi_agent::{
     AgentId, AgentMessage, AgentModel, AgentProfile, MessageType, MultiAgentStats,
     MultiAgentSystem,
 };
+pub use brain_agent::{BrainAgent, BrainAgentConfig, BrainAgentCycleResult, BrainAgentStats};
