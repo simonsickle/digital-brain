@@ -414,6 +414,16 @@ impl Brain {
         self.hippocampus.retrieve_by_query(query, limit)
     }
 
+    /// Export all memories as JSON.
+    pub fn export_memories(&self) -> Result<String> {
+        self.hippocampus.export_json()
+    }
+
+    /// Import memories from JSON.
+    pub fn import_memories(&self, json: &str) -> Result<usize> {
+        self.hippocampus.import_json(json)
+    }
+
     /// Ask the brain to reflect on something.
     pub fn reflect(&mut self, topic: &str) -> String {
         self.dmn

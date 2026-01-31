@@ -38,6 +38,8 @@ fn print_help() {
   believe <text>   Add a belief about self-capability
   save <path>      Save brain state to directory
   load <path>      Load brain state from directory
+  export <file>    Export memories to JSON file
+  import <file>    Import memories from JSON file
   help             Show this help
   quit             Exit the REPL
 ");
@@ -214,6 +216,38 @@ fn main() -> digital_brain::Result<()> {
                         println!("✓ Loaded from '{}'", arg);
                     }
                     Err(e) => println!("Error: {}", e),
+                }
+            }
+
+            "export" => {
+                if arg.is_empty() {
+                    println!("Usage: export <file.json>");
+                    continue;
+                }
+                match brain.export_memories() {
+                    Ok(json) => {
+                        match std::fs::write(arg, &json) {
+                            Ok(()) => println!("✓ Exported memories to '{}'", arg),
+                            Err(e) => println!("Error writing file: {}", e),
+                        }
+                    }
+                    Err(e) => println!("Error: {}", e),
+                }
+            }
+
+            "import" => {
+                if arg.is_empty() {
+                    println!("Usage: import <file.json>");
+                    continue;
+                }
+                match std::fs::read_to_string(arg) {
+                    Ok(json) => {
+                        match brain.import_memories(&json) {
+                            Ok(count) => println!("✓ Imported {} memories from '{}'", count, arg),
+                            Err(e) => println!("Error importing: {}", e),
+                        }
+                    }
+                    Err(e) => println!("Error reading file: {}", e),
                 }
             }
 
