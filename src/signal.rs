@@ -236,6 +236,12 @@ impl BrainSignal {
         self
     }
 
+    /// Set priority.
+    pub fn with_priority(mut self, priority: i32) -> Self {
+        self.priority = priority;
+        self
+    }
+
     /// Is this signal surprising? (high salience + high arousal)
     pub fn is_surprising(&self) -> bool {
         self.salience.is_high() && self.arousal.is_high()
