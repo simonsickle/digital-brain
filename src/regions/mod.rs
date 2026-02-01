@@ -12,6 +12,8 @@
 //! - **acc**: Error detection, conflict monitoring
 //! - **cerebellum**: Procedural memory, timing, motor learning
 //! - **stn**: Response inhibition, task watchdog, emergency brake
+//! - **insula**: Interoception, body awareness, empathy, disgust
+//! - **hypothalamus**: Drives, homeostasis, circadian rhythms, stress response
 
 pub mod acc;
 pub mod amygdala;
@@ -19,6 +21,8 @@ pub mod basal_ganglia;
 pub mod cerebellum;
 pub mod dmn;
 pub mod hippocampus;
+pub mod hypothalamus;
+pub mod insula;
 pub mod prefrontal;
 pub mod schema;
 pub mod stn;
@@ -28,4 +32,12 @@ pub mod thalamus;
 pub use acc::{ACC, Conflict, ControlSignal, Error, ErrorType};
 pub use basal_ganglia::{ActionPattern, BasalGanglia, GateDecision, SelectionResult};
 pub use cerebellum::{Cerebellum, Procedure, ProcedureStep, TimingPrediction};
+pub use hypothalamus::{
+    CircadianPhase, CircadianRhythm, DriveState, DriveType, Hypothalamus, HypothalamusConfig,
+    HypothalamusStats, MotivationSummary, StressResponse,
+};
+pub use insula::{
+    BodyState, DisgustResponse, DisgustType, EmpathicResponse, Insula, InsulaConfig,
+    InsulaStats, RiskAnticipation, SubjectiveFeeling,
+};
 pub use stn::{MonitoredTask, STN, StopReason, StopSignal, TaskConfig, TaskId, TaskState};
