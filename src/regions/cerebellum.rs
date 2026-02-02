@@ -21,6 +21,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use crate::core::imagination::{ImaginationType, Imagining};
+use crate::regions::motor_cortex::MotorCommand;
+
 /// A learned procedure/skill
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Procedure {
@@ -142,7 +145,7 @@ impl Procedure {
 }
 
 /// A timing prediction
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimingPrediction {
     pub event: String,
     pub predicted_time: DateTime<Utc>,
@@ -166,6 +169,45 @@ impl TimingPrediction {
     }
 }
 
+/// Forward model for predicting outcomes of a procedure.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForwardModel {
+    pub procedure_id: Uuid,
+    pub expected_outcomes: Vec<String>,
+    pub expected_sensations: Vec<String>,
+    pub confidence: f64,
+    pub last_updated: DateTime<Utc>,
+}
+
+/// Motor imagery produced by cerebellar simulation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MotorImagery {
+    pub command_id: Uuid,
+    pub action_name: String,
+    pub predicted_outcomes: Vec<String>,
+    pub predicted_sensations: Vec<String>,
+    pub timing_prediction: TimingPrediction,
+    pub success_probability: f64,
+    pub confidence: f64,
+}
+
+impl MotorImagery {
+    pub fn to_imagining(&self) -> Imagining {
+        let content = format!(
+            "Simulate action '{}': outcomes [{}], sensations [{}]",
+            self.action_name,
+            self.predicted_outcomes.join(", "),
+            self.predicted_sensations.join(", ")
+        );
+
+        let mut imagining = Imagining::new(ImaginationType::Simulation, content, Vec::new());
+        imagining.confidence = self.confidence;
+        imagining.novelty = 0.4;
+        imagining.utility = self.success_probability;
+        imagining
+    }
+}
+
 /// Statistics for the cerebellum
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CerebellumStats {
@@ -176,6 +218,8 @@ pub struct CerebellumStats {
     pub average_error_rate: f64,
     pub timing_predictions: u64,
     pub timing_accuracy: f64,
+    pub forward_models: u64,
+    pub imagery_simulations: u64,
 }
 
 /// The Cerebellum
@@ -185,12 +229,18 @@ pub struct Cerebellum {
     procedures: HashMap<Uuid, Procedure>,
     /// Procedures indexed by name
     name_index: HashMap<String, Uuid>,
+    /// Forward models for procedures
+    forward_models: HashMap<Uuid, ForwardModel>,
     /// Active timing predictions
     timing_predictions: Vec<TimingPrediction>,
     /// Timing error history (for calibration)
     timing_errors: Vec<i64>,
     /// Internal clock rate (for timing calibration)
     clock_rate: f64,
+    /// Motor imagery history
+    imagery_history: Vec<MotorImagery>,
+    /// Maximum motor imagery history
+    imagery_history_limit: usize,
     /// Statistics
     stats: CerebellumStats,
 }
@@ -200,9 +250,12 @@ impl Cerebellum {
         Self {
             procedures: HashMap::new(),
             name_index: HashMap::new(),
+            forward_models: HashMap::new(),
             timing_predictions: Vec::new(),
             timing_errors: Vec::new(),
             clock_rate: 1.0,
+            imagery_history: Vec::new(),
+            imagery_history_limit: 32,
             stats: CerebellumStats::default(),
         }
     }
@@ -281,6 +334,88 @@ impl Cerebellum {
         self.timing_predictions.push(prediction.clone());
         self.stats.timing_predictions += 1;
         prediction
+    }
+
+    /// Update or create a forward model for a procedure.
+    pub fn update_forward_model(
+        &mut self,
+        procedure_id: Uuid,
+        outcomes: Vec<String>,
+        sensations: Vec<String>,
+        confidence: f64,
+    ) {
+        let model = ForwardModel {
+            procedure_id,
+            expected_outcomes: outcomes,
+            expected_sensations: sensations,
+            confidence: confidence.clamp(0.0, 1.0),
+            last_updated: Utc::now(),
+        };
+
+        self.forward_models.insert(procedure_id, model);
+        self.stats.forward_models = self.forward_models.len() as u64;
+    }
+
+    /// Simulate the outcome of a motor command (motor imagery).
+    pub fn simulate_command(&mut self, command: &MotorCommand) -> MotorImagery {
+        let procedure_id = self.name_index.get(&command.name).copied();
+        let (model_outcomes, model_sensations, model_confidence) = procedure_id
+            .and_then(|id| self.forward_models.get(&id))
+            .map(|model| {
+                (
+                    Some(model.expected_outcomes.clone()),
+                    Some(model.expected_sensations.clone()),
+                    Some(model.confidence),
+                )
+            })
+            .unwrap_or((None, None, None));
+        let success_probability = procedure_id
+            .and_then(|id| self.procedures.get(&id))
+            .map(|proc| (1.0 - proc.error_rate).clamp(0.05, 0.99))
+            .unwrap_or(0.5);
+
+        let predicted_outcomes = model_outcomes.unwrap_or_else(|| {
+            if command.steps.is_empty() {
+                vec![format!("complete:{}", command.name)]
+            } else {
+                command
+                    .steps
+                    .iter()
+                    .map(|step| format!("complete:{}", step.description))
+                    .collect()
+            }
+        });
+
+        let predicted_sensations = model_sensations.unwrap_or_else(|| {
+            command
+                .steps
+                .iter()
+                .map(|step| format!("sensation:{}", step.description))
+                .collect()
+        });
+
+        let timing_prediction = self.predict_timing(
+            &format!("motor:{}", command.name),
+            command.estimated_duration_ms as i64,
+        );
+
+        let confidence = (timing_prediction.confidence * 0.5
+            + model_confidence.unwrap_or(0.4) * 0.3
+            + success_probability * 0.2)
+            .clamp(0.0, 1.0);
+
+        let imagery = MotorImagery {
+            command_id: command.id,
+            action_name: command.name.clone(),
+            predicted_outcomes,
+            predicted_sensations,
+            timing_prediction,
+            success_probability,
+            confidence,
+        };
+
+        self.record_imagery(imagery.clone());
+        imagery
     }
 
     /// Record actual timing (for learning)
@@ -387,6 +522,14 @@ impl Cerebellum {
 
         self.stats.average_error_rate = self.procedures.values().map(|p| p.error_rate).sum::<f64>()
             / self.procedures.len() as f64;
+    }
+
+    fn record_imagery(&mut self, imagery: MotorImagery) {
+        if self.imagery_history.len() == self.imagery_history_limit {
+            self.imagery_history.remove(0);
+        }
+        self.imagery_history.push(imagery);
+        self.stats.imagery_simulations += 1;
     }
 
     /// Get statistics
@@ -500,5 +643,36 @@ mod tests {
 
         let skill = cerebellum.get(id).unwrap().skill_level;
         assert!(skill < 0.5, "Skill should decay without practice");
+    }
+
+    #[test]
+    fn test_motor_imagery_from_command() {
+        let mut cerebellum = Cerebellum::new();
+        let mut motor_cortex = crate::regions::motor_cortex::MotorCortex::new();
+
+        let procedure = Procedure::new("wave").with_steps(vec![("raise", 400), ("wave", 600)]);
+        let procedure_id = cerebellum.learn(procedure);
+        cerebellum.update_forward_model(
+            procedure_id,
+            vec!["greeting acknowledged".to_string()],
+            vec!["arm movement".to_string()],
+            0.7,
+        );
+
+        let action = crate::regions::basal_ganglia::ActionPattern::new("wave")
+            .with_sub_actions(vec!["raise", "wave"]);
+        let command = motor_cortex.prepare_command(&action, "greet", 0.6, false);
+
+        let imagery = cerebellum.simulate_command(&command);
+        assert!(
+            imagery
+                .predicted_outcomes
+                .iter()
+                .any(|o| o.contains("greeting"))
+        );
+        assert!(imagery.success_probability > 0.0);
+
+        let imagining = imagery.to_imagining();
+        assert_eq!(imagining.imagination_type, ImaginationType::Simulation);
     }
 }

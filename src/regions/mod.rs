@@ -37,7 +37,9 @@ pub mod thalamus;
 // Re-export key types
 pub use acc::{ACC, Conflict, ControlSignal, Error, ErrorType};
 pub use basal_ganglia::{ActionPattern, BasalGanglia, GateDecision, SelectionResult};
-pub use cerebellum::{Cerebellum, Procedure, ProcedureStep, TimingPrediction};
+pub use cerebellum::{
+    Cerebellum, ForwardModel, MotorImagery, Procedure, ProcedureStep, TimingPrediction,
+};
 pub use hypothalamus::{
     CircadianPhase, CircadianRhythm, DriveState, DriveType, Hypothalamus, HypothalamusConfig,
     HypothalamusStats, MotivationSummary, StressResponse,

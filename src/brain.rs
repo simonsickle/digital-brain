@@ -1249,9 +1249,22 @@ impl Brain {
                 .prepare_command(action, context, result.confidence, result.habitual);
 
         let salience = (result.confidence * 0.7 + action.automaticity * 0.3).clamp(0.0, 1.0);
-        let motor_signal = BrainSignal::new("motor_cortex", SignalType::Motor, command.clone())
+        let imagery = self.cerebellum.simulate_command(&command);
+        let imagining = imagery.to_imagining();
+
+        let mut motor_signal = BrainSignal::new("motor_cortex", SignalType::Motor, command.clone())
             .with_salience(salience)
             .with_priority(if result.habitual { 1 } else { 0 });
+        if let Ok(value) = serde_json::to_value(&imagery) {
+            motor_signal
+                .metadata
+                .insert("motor_imagery".to_string(), value);
+        }
+        if let Ok(value) = serde_json::to_value(&imagining) {
+            motor_signal
+                .metadata
+                .insert("imagination_seed".to_string(), value);
+        }
 
         self.nervous_system.transmit(
             BrainRegion::BasalGanglia,
