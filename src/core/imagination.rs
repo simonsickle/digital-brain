@@ -307,7 +307,7 @@ impl<L: LlmBackend> ImaginationEngine<L> {
             .imaginations
             .iter()
             .filter(|i| !i.archived)
-            .filter(|i| filter_type.map_or(true, |t| i.imagination_type == t))
+            .filter(|i| filter_type.is_none_or(|t| i.imagination_type == t))
             .collect();
 
         results.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -318,33 +318,28 @@ impl<L: LlmBackend> ImaginationEngine<L> {
     /// Get statistics
     pub fn stats(&self) -> ImaginationStats {
         let mut stats = ImaginationStats::default();
-        
+
         for imagining in &self.imaginations {
             if imagining.archived {
                 continue;
             }
-            
+
             stats.total_imaginations += 1;
             stats.total_useful += imagining.useful_count as usize;
-            
-            let type_stats = stats
-                .by_type
-                .entry(imagining.imagination_type)
-                .or_default();
-            
+
+            let type_stats = stats.by_type.entry(imagining.imagination_type).or_default();
+
             type_stats.count += 1;
             type_stats.useful_count += imagining.useful_count as usize;
-            
+
             // Running average
             let n = type_stats.count as f64;
-            type_stats.avg_confidence = 
+            type_stats.avg_confidence =
                 type_stats.avg_confidence * (n - 1.0) / n + imagining.confidence / n;
-            type_stats.avg_novelty = 
-                type_stats.avg_novelty * (n - 1.0) / n + imagining.novelty / n;
-            type_stats.avg_utility = 
-                type_stats.avg_utility * (n - 1.0) / n + imagining.utility / n;
+            type_stats.avg_novelty = type_stats.avg_novelty * (n - 1.0) / n + imagining.novelty / n;
+            type_stats.avg_utility = type_stats.avg_utility * (n - 1.0) / n + imagining.utility / n;
         }
-        
+
         stats
     }
 
@@ -356,7 +351,7 @@ impl<L: LlmBackend> ImaginationEngine<L> {
         count: Option<usize>,
     ) -> Result<RecombinationResult, ImaginationError> {
         let count = count.unwrap_or(self.config.default_recombination_count);
-        
+
         if memories.is_empty() {
             return Err(ImaginationError::InsufficientMemories);
         }
@@ -385,7 +380,7 @@ be plausible given the source material. Output JSON with format:
         let ideas = self.parse_ideas_response(&response)?;
 
         let source_ids: Vec<String> = memories.iter().map(|m| m.id.clone()).collect();
-        
+
         let mut imaginings = Vec::new();
         for idea in ideas.into_iter().take(count) {
             let imagining = Imagining::new(
@@ -435,18 +430,14 @@ Be specific and concrete, not vague. Output JSON:
         let (content, confidence, key_factors) = self.parse_simulation_response(&response)?;
 
         let source_ids: Vec<String> = memories.iter().map(|m| m.id.clone()).collect();
-        
-        let imagining = Imagining::new(
-            ImaginationType::Simulation,
-            content,
-            source_ids,
-        )
-        .with_confidence(confidence)
-        .with_novelty(0.6)
-        .with_utility(0.7)
-        .with_metadata("scenario", serde_json::json!(scenario))
-        .with_metadata("depth", serde_json::json!(depth))
-        .with_metadata("key_factors", serde_json::json!(&key_factors));
+
+        let imagining = Imagining::new(ImaginationType::Simulation, content, source_ids)
+            .with_confidence(confidence)
+            .with_novelty(0.6)
+            .with_utility(0.7)
+            .with_metadata("scenario", serde_json::json!(scenario))
+            .with_metadata("depth", serde_json::json!(depth))
+            .with_metadata("key_factors", serde_json::json!(&key_factors));
 
         self.store(imagining.clone());
 
@@ -483,18 +474,14 @@ Output JSON: {"counterfactual": "narrative", "divergences": ["point1", "point2"]
         let (content, confidence, divergences) = self.parse_counterfactual_response(&response)?;
 
         let source_ids: Vec<String> = memories.iter().map(|m| m.id.clone()).collect();
-        
-        let imagining = Imagining::new(
-            ImaginationType::Counterfactual,
-            content,
-            source_ids,
-        )
-        .with_confidence(confidence)
-        .with_novelty(0.8)
-        .with_utility(0.4)
-        .with_metadata("event", serde_json::json!(event))
-        .with_metadata("alternate", serde_json::json!(alternate))
-        .with_metadata("divergences", serde_json::json!(divergences));
+
+        let imagining = Imagining::new(ImaginationType::Counterfactual, content, source_ids)
+            .with_confidence(confidence)
+            .with_novelty(0.8)
+            .with_utility(0.4)
+            .with_metadata("event", serde_json::json!(event))
+            .with_metadata("alternate", serde_json::json!(alternate))
+            .with_metadata("divergences", serde_json::json!(divergences));
 
         self.store(imagining.clone());
 
@@ -508,12 +495,12 @@ Output JSON: {"counterfactual": "narrative", "divergences": ["point1", "point2"]
         associations: Option<usize>,
     ) -> Result<DreamResult, ImaginationError> {
         let associations = associations.unwrap_or(self.config.default_dream_associations);
-        
+
         let mut current_content = seed
             .as_ref()
             .map(|s| s.content.clone())
             .unwrap_or_else(|| "consciousness emerging from void".to_string());
-        
+
         let seed_str = seed.as_ref().map(|s| s.content.clone());
         let mut sequence = Vec::new();
 
@@ -535,17 +522,19 @@ Output JSON: {"association": "the connection", "leap_type": "metaphor|memory|emo
             let imagining = Imagining::new(
                 ImaginationType::Dream,
                 content.clone(),
-                seed.as_ref().map(|s| vec![s.id.clone()]).unwrap_or_default(),
+                seed.as_ref()
+                    .map(|s| vec![s.id.clone()])
+                    .unwrap_or_default(),
             )
             .with_confidence(0.3) // Dreams are uncertain
-            .with_novelty(0.9)    // But highly novel
+            .with_novelty(0.9) // But highly novel
             .with_utility(0.3)
             .with_metadata("leap_type", serde_json::json!(leap_type))
             .with_metadata("chain_position", serde_json::json!(i + 1));
 
             self.store(imagining.clone());
             sequence.push(imagining);
-            
+
             current_content = content;
         }
 
@@ -586,17 +575,13 @@ Output JSON: {"synthesis": "the insight", "patterns": ["pattern1", "pattern2"],
         let (content, confidence, utility, patterns) = self.parse_synthesis_response(&response)?;
 
         let source_ids: Vec<String> = memories.iter().map(|m| m.id.clone()).collect();
-        
-        let imagining = Imagining::new(
-            ImaginationType::Synthesis,
-            content,
-            source_ids,
-        )
-        .with_confidence(confidence)
-        .with_novelty(0.8)
-        .with_utility(utility)
-        .with_metadata("domain", serde_json::json!(domain))
-        .with_metadata("patterns", serde_json::json!(patterns));
+
+        let imagining = Imagining::new(ImaginationType::Synthesis, content, source_ids)
+            .with_confidence(confidence)
+            .with_novelty(0.8)
+            .with_utility(utility)
+            .with_metadata("domain", serde_json::json!(domain))
+            .with_metadata("patterns", serde_json::json!(patterns));
 
         self.store(imagining.clone());
 
@@ -627,21 +612,18 @@ Output JSON: {"hypothesis": "if X then Y", "test": "how to test it",
         );
 
         let response = self.call_llm(system, &prompt).await?;
-        let (content, confidence, test, implications) = self.parse_hypothesis_response(&response)?;
+        let (content, confidence, test, implications) =
+            self.parse_hypothesis_response(&response)?;
 
         let source_ids: Vec<String> = memories.iter().map(|m| m.id.clone()).collect();
-        
-        let imagining = Imagining::new(
-            ImaginationType::Hypothesis,
-            content,
-            source_ids,
-        )
-        .with_confidence(confidence)
-        .with_novelty(0.6)
-        .with_utility(0.8) // Hypotheses are highly actionable
-        .with_metadata("observation", serde_json::json!(observation))
-        .with_metadata("test", serde_json::json!(test))
-        .with_metadata("implications", serde_json::json!(implications));
+
+        let imagining = Imagining::new(ImaginationType::Hypothesis, content, source_ids)
+            .with_confidence(confidence)
+            .with_novelty(0.6)
+            .with_utility(0.8) // Hypotheses are highly actionable
+            .with_metadata("observation", serde_json::json!(observation))
+            .with_metadata("test", serde_json::json!(test))
+            .with_metadata("implications", serde_json::json!(implications));
 
         self.store(imagining.clone());
 
@@ -675,75 +657,92 @@ Output JSON: {"hypothesis": "if X then Y", "test": "how to test it",
         let json_str = extract_json(response);
         let parsed: serde_json::Value = serde_json::from_str(&json_str)
             .map_err(|e| ImaginationError::ParseError(e.to_string()))?;
-        
-        let ideas = parsed.get("ideas")
+
+        let ideas = parsed
+            .get("ideas")
             .and_then(|v| v.as_array())
             .ok_or_else(|| ImaginationError::ParseError("Missing ideas array".to_string()))?;
-        
+
         let mut results = Vec::new();
         for idea in ideas {
             results.push(IdeaResponse {
-                content: idea.get("content")
+                content: idea
+                    .get("content")
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string(),
-                confidence: idea.get("confidence")
+                confidence: idea
+                    .get("confidence")
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.5),
-                novelty: idea.get("novelty")
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(0.7),
+                novelty: idea.get("novelty").and_then(|v| v.as_f64()).unwrap_or(0.7),
             });
         }
-        
+
         Ok(results)
     }
 
-    fn parse_simulation_response(&self, response: &str) -> Result<(String, f64, Vec<String>), ImaginationError> {
+    fn parse_simulation_response(
+        &self,
+        response: &str,
+    ) -> Result<(String, f64, Vec<String>), ImaginationError> {
         let json_str = extract_json(response);
         let parsed: serde_json::Value = serde_json::from_str(&json_str)
             .map_err(|e| ImaginationError::ParseError(e.to_string()))?;
-        
-        let content = parsed.get("simulation")
+
+        let content = parsed
+            .get("simulation")
             .and_then(|v| v.as_str())
             .unwrap_or(response)
             .to_string();
-        
-        let confidence = parsed.get("confidence")
+
+        let confidence = parsed
+            .get("confidence")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.5);
-        
-        let key_factors = parsed.get("key_factors")
+
+        let key_factors = parsed
+            .get("key_factors")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
-        
+
         Ok((content, confidence, key_factors))
     }
 
-    fn parse_counterfactual_response(&self, response: &str) -> Result<(String, f64, Vec<String>), ImaginationError> {
+    fn parse_counterfactual_response(
+        &self,
+        response: &str,
+    ) -> Result<(String, f64, Vec<String>), ImaginationError> {
         let json_str = extract_json(response);
         let parsed: serde_json::Value = serde_json::from_str(&json_str)
             .map_err(|e| ImaginationError::ParseError(e.to_string()))?;
-        
-        let content = parsed.get("counterfactual")
+
+        let content = parsed
+            .get("counterfactual")
             .and_then(|v| v.as_str())
             .unwrap_or(response)
             .to_string();
-        
-        let confidence = parsed.get("confidence")
+
+        let confidence = parsed
+            .get("confidence")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.4);
-        
-        let divergences = parsed.get("divergences")
+
+        let divergences = parsed
+            .get("divergences")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
-        
+
         Ok((content, confidence, divergences))
     }
 
@@ -751,74 +750,94 @@ Output JSON: {"hypothesis": "if X then Y", "test": "how to test it",
         let json_str = extract_json(response);
         let parsed: serde_json::Value = serde_json::from_str(&json_str)
             .map_err(|e| ImaginationError::ParseError(e.to_string()))?;
-        
-        let content = parsed.get("association")
+
+        let content = parsed
+            .get("association")
             .and_then(|v| v.as_str())
             .unwrap_or(response)
             .to_string();
-        
-        let leap_type = parsed.get("leap_type")
+
+        let leap_type = parsed
+            .get("leap_type")
             .and_then(|v| v.as_str())
             .unwrap_or("pattern")
             .to_string();
-        
+
         Ok((content, leap_type))
     }
 
-    fn parse_synthesis_response(&self, response: &str) -> Result<(String, f64, f64, Vec<String>), ImaginationError> {
+    fn parse_synthesis_response(
+        &self,
+        response: &str,
+    ) -> Result<(String, f64, f64, Vec<String>), ImaginationError> {
         let json_str = extract_json(response);
         let parsed: serde_json::Value = serde_json::from_str(&json_str)
             .map_err(|e| ImaginationError::ParseError(e.to_string()))?;
-        
-        let content = parsed.get("synthesis")
+
+        let content = parsed
+            .get("synthesis")
             .and_then(|v| v.as_str())
             .unwrap_or(response)
             .to_string();
-        
-        let confidence = parsed.get("confidence")
+
+        let confidence = parsed
+            .get("confidence")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.6);
-        
-        let utility = parsed.get("utility")
+
+        let utility = parsed
+            .get("utility")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.6);
-        
-        let patterns = parsed.get("patterns")
+
+        let patterns = parsed
+            .get("patterns")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
-        
+
         Ok((content, confidence, utility, patterns))
     }
 
-    fn parse_hypothesis_response(&self, response: &str) -> Result<(String, f64, String, Vec<String>), ImaginationError> {
+    fn parse_hypothesis_response(
+        &self,
+        response: &str,
+    ) -> Result<(String, f64, String, Vec<String>), ImaginationError> {
         let json_str = extract_json(response);
         let parsed: serde_json::Value = serde_json::from_str(&json_str)
             .map_err(|e| ImaginationError::ParseError(e.to_string()))?;
-        
-        let content = parsed.get("hypothesis")
+
+        let content = parsed
+            .get("hypothesis")
             .and_then(|v| v.as_str())
             .unwrap_or(response)
             .to_string();
-        
-        let confidence = parsed.get("confidence")
+
+        let confidence = parsed
+            .get("confidence")
             .and_then(|v| v.as_f64())
             .unwrap_or(0.5);
-        
-        let test = parsed.get("test")
+
+        let test = parsed
+            .get("test")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        
-        let implications = parsed.get("implications")
+
+        let implications = parsed
+            .get("implications")
             .and_then(|v| v.as_array())
-            .map(|arr| arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
-        
+
         Ok((content, confidence, test, implications))
     }
 }
@@ -857,13 +876,13 @@ struct IdeaResponse {
 pub enum ImaginationError {
     #[error("LLM error: {0}")]
     LlmError(String),
-    
+
     #[error("Parse error: {0}")]
     ParseError(String),
-    
+
     #[error("Insufficient source memories")]
     InsufficientMemories,
-    
+
     #[error("Storage error: {0}")]
     StorageError(String),
 }
@@ -918,6 +937,9 @@ mod tests {
     #[test]
     fn test_imagination_type_display() {
         assert_eq!(format!("{}", ImaginationType::Dream), "dream");
-        assert_eq!(format!("{}", ImaginationType::Recombination), "recombination");
+        assert_eq!(
+            format!("{}", ImaginationType::Recombination),
+            "recombination"
+        );
     }
 }

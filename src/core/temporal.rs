@@ -28,7 +28,7 @@
 
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use uuid::Uuid;
 
 /// Unique identifier for prospective memory tasks
@@ -86,39 +86,42 @@ impl DurationPerception {
     }
 
     /// Modulate perception rate based on state
-    /// 
+    ///
     /// - High arousal → time feels slower (more pulses)
     /// - High attention → time feels faster (fewer pulses)
     /// - Boredom → time drags (fewer pulses perceived, but feels longer!)
     pub fn modulate(&mut self, arousal: f64, attention: f64, boredom: f64) {
         // Arousal speeds up internal clock
         let arousal_effect = 1.0 + (arousal - 0.5) * 0.4;
-        
+
         // Focused attention makes time fly
         let attention_effect = 1.0 - attention * 0.3;
-        
+
         // Boredom is complex: clock slows but perceived duration increases
         // We model this as a slower rate (time "drags")
         let boredom_effect = 1.0 - boredom * 0.2;
-        
+
         self.current_rate = self.base_rate * arousal_effect * attention_effect * boredom_effect;
         self.current_rate = self.current_rate.clamp(0.5, 2.0);
     }
 
     /// Calibrate against objective time (for learning)
     pub fn calibrate(&mut self, objective_seconds: f64, subjective_seconds: f64) {
-        self.calibration_history.push_back((objective_seconds, subjective_seconds));
+        self.calibration_history
+            .push_back((objective_seconds, subjective_seconds));
         if self.calibration_history.len() > 100 {
             self.calibration_history.pop_front();
         }
-        
+
         // Adjust base rate based on accumulated error
         if self.calibration_history.len() >= 10 {
-            let avg_ratio: f64 = self.calibration_history
+            let avg_ratio: f64 = self
+                .calibration_history
                 .iter()
                 .map(|(obj, subj)| if *obj > 0.0 { subj / obj } else { 1.0 })
-                .sum::<f64>() / self.calibration_history.len() as f64;
-            
+                .sum::<f64>()
+                / self.calibration_history.len() as f64;
+
             // Slowly adjust base rate
             self.base_rate = self.base_rate * 0.95 + (1.0 / avg_ratio) * 0.05;
             self.base_rate = self.base_rate.clamp(0.8, 1.2);
@@ -182,7 +185,7 @@ impl TemporalMoment {
             timestamp,
             description: description.into(),
             valence: 0.0,
-            vividness: 0.3, // Future is less vivid by default
+            vividness: 0.3,  // Future is less vivid by default
             confidence: 0.5, // And less certain
             is_future: true,
             tags: Vec::new(),
@@ -244,7 +247,9 @@ impl MentalTimeTravel {
             if self.past_moments.len() > self.max_moments {
                 // Remove oldest, lowest vividness
                 self.past_moments.sort_by(|a, b| {
-                    (a.vividness + a.valence.abs()).partial_cmp(&(b.vividness + b.valence.abs())).unwrap()
+                    (a.vividness + a.valence.abs())
+                        .partial_cmp(&(b.vividness + b.valence.abs()))
+                        .unwrap()
                 });
                 self.past_moments.remove(0);
             }
@@ -257,9 +262,8 @@ impl MentalTimeTravel {
             self.future_moments.push(moment);
             if self.future_moments.len() > self.max_moments {
                 // Remove furthest, lowest confidence
-                self.future_moments.sort_by(|a, b| {
-                    a.confidence.partial_cmp(&b.confidence).unwrap()
-                });
+                self.future_moments
+                    .sort_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap());
                 self.future_moments.remove(0);
             }
         }
@@ -269,22 +273,25 @@ impl MentalTimeTravel {
     pub fn travel_to_past(&mut self, query: &str, limit: usize) -> Vec<&TemporalMoment> {
         self.temporal_focus = -0.5;
         let query_lower = query.to_lowercase();
-        
-        let mut relevant: Vec<_> = self.past_moments
+
+        let mut relevant: Vec<_> = self
+            .past_moments
             .iter()
             .filter(|m| {
-                m.description.to_lowercase().contains(&query_lower) ||
-                m.tags.iter().any(|t| t.to_lowercase().contains(&query_lower))
+                m.description.to_lowercase().contains(&query_lower)
+                    || m.tags
+                        .iter()
+                        .any(|t| t.to_lowercase().contains(&query_lower))
             })
             .collect();
-        
+
         // Sort by vividness and recency
         relevant.sort_by(|a, b| {
             let a_score = a.vividness + (1.0 / (a.distance_from_now().num_days() as f64 + 1.0));
             let b_score = b.vividness + (1.0 / (b.distance_from_now().num_days() as f64 + 1.0));
             b_score.partial_cmp(&a_score).unwrap()
         });
-        
+
         relevant.into_iter().take(limit).collect()
     }
 
@@ -292,26 +299,29 @@ impl MentalTimeTravel {
     pub fn travel_to_future(&mut self, query: &str, limit: usize) -> Vec<&TemporalMoment> {
         self.temporal_focus = 0.5;
         let query_lower = query.to_lowercase();
-        
+
         // Filter out past futures
         let now = Utc::now();
         self.future_moments.retain(|m| m.timestamp > now);
-        
-        let mut relevant: Vec<_> = self.future_moments
+
+        let mut relevant: Vec<_> = self
+            .future_moments
             .iter()
             .filter(|m| {
-                m.description.to_lowercase().contains(&query_lower) ||
-                m.tags.iter().any(|t| t.to_lowercase().contains(&query_lower))
+                m.description.to_lowercase().contains(&query_lower)
+                    || m.tags
+                        .iter()
+                        .any(|t| t.to_lowercase().contains(&query_lower))
             })
             .collect();
-        
+
         // Sort by proximity and confidence
         relevant.sort_by(|a, b| {
             let a_score = a.confidence / (a.distance_from_now().num_hours() as f64 + 1.0);
             let b_score = b.confidence / (b.distance_from_now().num_hours() as f64 + 1.0);
             b_score.partial_cmp(&a_score).unwrap()
         });
-        
+
         relevant.into_iter().take(limit).collect()
     }
 
@@ -324,7 +334,7 @@ impl MentalTimeTravel {
     pub fn upcoming(&self, within: Duration) -> Vec<&TemporalMoment> {
         let now = Utc::now();
         let cutoff = now + within;
-        
+
         self.future_moments
             .iter()
             .filter(|m| m.timestamp > now && m.timestamp <= cutoff)
@@ -373,7 +383,11 @@ impl ProspectiveTrigger {
                 let diff = current_time.signed_duration_since(*trigger_time);
                 diff.num_minutes().abs() <= 5 // Within 5 minute window
             }
-            Self::Event { pattern } | Self::Activity { after_completing: pattern } | Self::Context { condition: pattern } => {
+            Self::Event { pattern }
+            | Self::Activity {
+                after_completing: pattern,
+            }
+            | Self::Context { condition: pattern } => {
                 context.to_lowercase().contains(&pattern.to_lowercase())
             }
         }
@@ -479,10 +493,16 @@ impl ProspectiveMemory {
     }
 
     /// Create an event-based intention
-    pub fn intend_when(&mut self, event_pattern: impl Into<String>, action: impl Into<String>) -> IntentionId {
+    pub fn intend_when(
+        &mut self,
+        event_pattern: impl Into<String>,
+        action: impl Into<String>,
+    ) -> IntentionId {
         let intention = Intention::new(
             action,
-            ProspectiveTrigger::Event { pattern: event_pattern.into() }
+            ProspectiveTrigger::Event {
+                pattern: event_pattern.into(),
+            },
         );
         self.intend(intention)
     }
@@ -490,25 +510,25 @@ impl ProspectiveMemory {
     /// Check for triggered intentions
     pub fn check(&mut self, context: &str) -> Vec<Intention> {
         let now = Utc::now();
-        
+
         // Only check at configured frequency
         if now - self.last_check < self.check_frequency {
             return Vec::new();
         }
         self.last_check = now;
-        
+
         let mut triggered = Vec::new();
-        
+
         for intention in &mut self.intentions {
             if intention.active && intention.trigger.matches(now, context) {
                 intention.reminded();
                 triggered.push(intention.clone());
             }
         }
-        
+
         // Sort by priority
         triggered.sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap());
-        
+
         triggered
     }
 
@@ -545,11 +565,12 @@ impl ProspectiveMemory {
     pub fn upcoming_time_intentions(&self, within: Duration) -> Vec<&Intention> {
         let now = Utc::now();
         let cutoff = now + within;
-        
+
         self.intentions
             .iter()
             .filter(|i| {
-                i.active && matches!(&i.trigger, ProspectiveTrigger::Time(t) if *t > now && *t <= cutoff)
+                i.active
+                    && matches!(&i.trigger, ProspectiveTrigger::Time(t) if *t > now && *t <= cutoff)
             })
             .collect()
     }
@@ -559,7 +580,7 @@ impl ProspectiveMemory {
         let active = self.intentions.iter().filter(|i| i.active).count();
         let completed = self.completed.len();
         let forgotten = self.forgotten.len();
-        
+
         ProspectiveMemoryStats {
             active_intentions: active,
             completed_count: completed,
@@ -611,10 +632,10 @@ impl TemporalDiscounting {
     }
 
     /// Calculate present value of a future reward
-    /// 
+    ///
     /// Hyperbolic: V = A / (1 + k*D)
     /// Exponential: V = A * e^(-k*D)
-    /// 
+    ///
     /// Where:
     /// - V = present value
     /// - A = future amount
@@ -624,7 +645,7 @@ impl TemporalDiscounting {
         if delay_days <= 0.0 {
             return future_amount;
         }
-        
+
         if self.hyperbolic {
             future_amount / (1.0 + self.discount_rate * delay_days)
         } else {
@@ -633,7 +654,7 @@ impl TemporalDiscounting {
     }
 
     /// Should we wait for a larger future reward?
-    /// 
+    ///
     /// Returns true if the discounted future reward > immediate reward
     pub fn should_wait(&self, immediate: f64, future: f64, delay_days: f64) -> bool {
         let discounted_future = self.present_value(future, delay_days);
@@ -645,7 +666,7 @@ impl TemporalDiscounting {
         if smaller >= larger || smaller <= 0.0 {
             return None;
         }
-        
+
         // Solve: smaller = larger / (1 + k*D)
         // D = (larger/smaller - 1) / k
         let ratio = larger / smaller;
@@ -658,17 +679,17 @@ impl TemporalDiscounting {
     }
 
     /// Modulate discount rate based on state
-    /// 
+    ///
     /// - High serotonin (patience) → lower discount rate
     /// - High dopamine (reward-seeking) → higher discount rate
     /// - High stress → higher discount rate (prefer immediate)
     pub fn modulate(&mut self, serotonin: f64, dopamine: f64, stress: f64) {
         let base = 0.05; // Default moderate discounting
-        
+
         let serotonin_effect = 1.0 - serotonin * 0.5; // Patience reduces discounting
         let dopamine_effect = 1.0 + dopamine * 0.3; // Wanting increases discounting
         let stress_effect = 1.0 + stress * 0.4; // Stress increases discounting
-        
+
         self.discount_rate = base * serotonin_effect * dopamine_effect * stress_effect;
         self.discount_rate = self.discount_rate.clamp(0.001, 0.5);
     }
@@ -708,8 +729,15 @@ impl TemporalCognition {
     }
 
     /// Update temporal systems based on neuromodulator state
-    pub fn update(&mut self, arousal: f64, attention: f64, boredom: f64,
-                  serotonin: f64, dopamine: f64, stress: f64) {
+    pub fn update(
+        &mut self,
+        arousal: f64,
+        attention: f64,
+        boredom: f64,
+        serotonin: f64,
+        dopamine: f64,
+        stress: f64,
+    ) {
         self.duration.modulate(arousal, attention, boredom);
         self.discounting.modulate(serotonin, dopamine, stress);
     }
@@ -723,7 +751,7 @@ impl TemporalCognition {
     pub fn stats(&self) -> TemporalStats {
         let (past_count, future_count) = self.time_travel.stats();
         let prospective_stats = self.prospective.stats();
-        
+
         TemporalStats {
             duration_rate: self.duration.rate(),
             temporal_focus: self.time_travel.focus(),
@@ -765,7 +793,7 @@ mod tests {
     #[test]
     fn test_duration_perception() {
         let mut duration = DurationPerception::new();
-        
+
         // High arousal should speed up internal clock (more pulses = subjectively longer)
         duration.modulate(0.9, 0.5, 0.0);
         // Rate > 1.0 means time feels slower (more pulses per second)
@@ -776,14 +804,14 @@ mod tests {
         // So rate will be slightly below 1.0 in this case
         // Let's test that modulation works at all
         assert!(duration.rate() != 1.0);
-        
+
         // Very high arousal, no attention focus -> time should drag
         duration.modulate(0.95, 0.1, 0.0);
         // arousal_effect = 1.0 + (0.95 - 0.5) * 0.4 = 1.18
         // attention_effect = 1.0 - 0.1 * 0.3 = 0.97
         // Result = 1.0 * 1.18 * 0.97 = 1.14 (> 1.0)
         assert!(duration.rate() > 1.0);
-        
+
         // High attention should make time fly
         duration.modulate(0.5, 0.9, 0.0);
         assert!(duration.rate() < 1.0);
@@ -791,44 +819,43 @@ mod tests {
 
     #[test]
     fn test_temporal_moment() {
-        let past = TemporalMoment::past(
-            Utc::now() - Duration::days(7),
-            "Finished the project"
-        ).with_valence(0.8);
-        
+        let past = TemporalMoment::past(Utc::now() - Duration::days(7), "Finished the project")
+            .with_valence(0.8);
+
         assert!(!past.is_future);
         assert!(past.valence > 0.0);
-        
-        let future = TemporalMoment::future(
-            Utc::now() + Duration::days(7),
-            "Vacation starts"
-        ).with_valence(0.9);
-        
+
+        let future = TemporalMoment::future(Utc::now() + Duration::days(7), "Vacation starts")
+            .with_valence(0.9);
+
         assert!(future.is_future);
     }
 
     #[test]
     fn test_mental_time_travel() {
         let mut mtt = MentalTimeTravel::new();
-        
+
         // Add some past moments
-        mtt.remember(TemporalMoment::past(
-            Utc::now() - Duration::days(1),
-            "Had a great meeting about the project"
-        ).with_tag("work"));
-        
-        mtt.remember(TemporalMoment::past(
-            Utc::now() - Duration::days(30),
-            "Started the project"
-        ).with_tag("project"));
-        
+        mtt.remember(
+            TemporalMoment::past(
+                Utc::now() - Duration::days(1),
+                "Had a great meeting about the project",
+            )
+            .with_tag("work"),
+        );
+
+        mtt.remember(
+            TemporalMoment::past(Utc::now() - Duration::days(30), "Started the project")
+                .with_tag("project"),
+        );
+
         // Travel to past
         let memories = mtt.travel_to_past("project", 5);
         assert_eq!(memories.len(), 2);
-        
+
         // Focus should be in the past
         assert!(mtt.focus() < 0.0);
-        
+
         // Return to present
         mtt.return_to_present();
         assert_eq!(mtt.focus(), 0.0);
@@ -837,15 +864,12 @@ mod tests {
     #[test]
     fn test_prospective_memory() {
         let mut pm = ProspectiveMemory::new();
-        
+
         // Add a time-based intention
-        let id = pm.intend_at(
-            Utc::now() + Duration::minutes(2),
-            "Check email"
-        );
-        
+        let id = pm.intend_at(Utc::now() + Duration::minutes(2), "Check email");
+
         assert!(pm.active_intentions().len() == 1);
-        
+
         // Complete it
         pm.complete(id);
         assert!(pm.active_intentions().is_empty());
@@ -855,15 +879,15 @@ mod tests {
     #[test]
     fn test_prospective_trigger_matching() {
         let now = Utc::now();
-        
+
         // Time trigger
         let time_trigger = ProspectiveTrigger::Time(now);
         assert!(time_trigger.matches(now, ""));
         assert!(!time_trigger.matches(now + Duration::hours(1), ""));
-        
+
         // Event trigger
-        let event_trigger = ProspectiveTrigger::Event { 
-            pattern: "meeting".to_string() 
+        let event_trigger = ProspectiveTrigger::Event {
+            pattern: "meeting".to_string(),
         };
         assert!(event_trigger.matches(now, "Starting a meeting now"));
         assert!(!event_trigger.matches(now, "Working on code"));
@@ -872,12 +896,12 @@ mod tests {
     #[test]
     fn test_temporal_discounting() {
         let discounting = TemporalDiscounting::new(0.1);
-        
+
         // Future reward should be worth less
         let future_value = discounting.present_value(100.0, 30.0);
         assert!(future_value < 100.0);
         assert!(future_value > 0.0);
-        
+
         // Immediate reward should be unchanged
         let immediate = discounting.present_value(100.0, 0.0);
         assert_eq!(immediate, 100.0);
@@ -886,10 +910,10 @@ mod tests {
     #[test]
     fn test_should_wait_decision() {
         let discounting = TemporalDiscounting::new(0.05);
-        
+
         // Should wait for significantly larger reward
         assert!(discounting.should_wait(50.0, 100.0, 7.0));
-        
+
         // Shouldn't wait too long for small increase
         assert!(!discounting.should_wait(90.0, 100.0, 30.0));
     }
@@ -897,11 +921,11 @@ mod tests {
     #[test]
     fn test_discounting_modulation() {
         let mut discounting = TemporalDiscounting::new(0.05);
-        
+
         // High patience (serotonin) should reduce discounting
         discounting.modulate(0.9, 0.5, 0.0);
         assert!(discounting.rate() < 0.05);
-        
+
         // High stress should increase discounting
         discounting.modulate(0.5, 0.5, 0.9);
         assert!(discounting.rate() > 0.05);
@@ -910,18 +934,18 @@ mod tests {
     #[test]
     fn test_temporal_cognition_system() {
         let mut temporal = TemporalCognition::new();
-        
+
         // Add some anticipated events
         temporal.time_travel.anticipate(
-            TemporalMoment::future(
-                Utc::now() + Duration::hours(2),
-                "Important deadline"
-            ).with_valence(-0.3)
+            TemporalMoment::future(Utc::now() + Duration::hours(2), "Important deadline")
+                .with_valence(-0.3),
         );
-        
+
         // Add prospective intention
-        temporal.prospective.intend_when("deadline", "Submit the report");
-        
+        temporal
+            .prospective
+            .intend_when("deadline", "Submit the report");
+
         // Check stats
         let stats = temporal.stats();
         assert_eq!(stats.future_moments, 1);
@@ -931,11 +955,11 @@ mod tests {
     #[test]
     fn test_indifference_delay() {
         let discounting = TemporalDiscounting::new(0.1);
-        
+
         // At what delay is $50 now equal to $100 later?
         let delay = discounting.indifference_delay(50.0, 100.0);
         assert!(delay.is_some());
-        
+
         let d = delay.unwrap();
         // At this delay, present values should be roughly equal
         let pv = discounting.present_value(100.0, d);

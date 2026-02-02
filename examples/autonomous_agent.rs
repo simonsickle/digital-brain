@@ -12,22 +12,32 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::sync::mpsc;
 
 use digital_brain::core::{
-    // Consciousness loop
-    ConsciousAction, ConsciousnessConfig, ConsciousnessLoop, ConsciousnessState,
-    ProcessingContext, StimulusProcessor, ActionResult,
-    
-    // Sensory streams
-    ClockConfig, ClockStream, FileSystemConfig, FileSystemStream,
-    PromptSender, PromptStream, SensoryCortex,
-    
+    ActionResult,
+
+    ActivityFingerprint,
+
     // Boredom & Curiosity
-    BoredomTracker, ActivityFingerprint,
-    
+    BoredomTracker,
+    // Sensory streams
+    ClockConfig,
+    ClockStream,
+    // Consciousness loop
+    ConsciousAction,
+    ConsciousnessConfig,
+    ConsciousnessLoop,
+    DriveEvent,
+    FileSystemConfig,
+    FileSystemStream,
+    ProcessingContext,
+    PromptStream,
+    SensoryCortex,
+
     // Stimulus types
-    Stimulus, StimulusKind, DriveEvent,
+    Stimulus,
+    StimulusKind,
+    StimulusProcessor,
 };
 
 /// Our autonomous processor - this is where the "thinking" happens
@@ -65,7 +75,7 @@ impl StimulusProcessor for AutonomousProcessor {
         context: &ProcessingContext,
     ) -> Option<ConsciousAction> {
         self.cycle_count = context.cycle;
-        
+
         // Record activity for boredom tracking
         if let Ok(mut boredom) = self.boredom.lock() {
             let fingerprint = ActivityFingerprint::new(
@@ -79,7 +89,7 @@ impl StimulusProcessor for AutonomousProcessor {
             // Human prompt - highest priority
             StimulusKind::ExternalPrompt { content, .. } => {
                 self.log(&format!("📨 Received prompt: {}", content));
-                
+
                 // In real implementation: send to LLM with context
                 // For now, simple echo with awareness
                 let response = if content.to_lowercase().contains("how are you") {
@@ -119,19 +129,19 @@ impl StimulusProcessor for AutonomousProcessor {
                     _ => None,
                 };
 
-                if let Some(p) = path {
-                    if !self.files_seen.contains(&p) {
-                        self.files_seen.push(p.clone());
-                        
-                        // Signal novelty to boredom tracker
-                        if let Ok(mut boredom) = self.boredom.lock() {
-                            boredom.signal_novelty();
-                        }
+                if let Some(p) = path
+                    && !self.files_seen.contains(&p)
+                {
+                    self.files_seen.push(p.clone());
 
-                        return Some(ConsciousAction::Observe {
-                            target: p.to_string_lossy().to_string(),
-                        });
+                    // Signal novelty to boredom tracker
+                    if let Ok(mut boredom) = self.boredom.lock() {
+                        boredom.signal_novelty();
                     }
+
+                    return Some(ConsciousAction::Observe {
+                        target: p.to_string_lossy().to_string(),
+                    });
                 }
                 None
             }
@@ -139,44 +149,52 @@ impl StimulusProcessor for AutonomousProcessor {
             // Internal drive - curiosity, boredom, etc.
             StimulusKind::Drive(drive) => {
                 match drive {
-                    DriveEvent::Curiosity { domain, intensity, .. } => {
-                        self.log(&format!("🔍 Curiosity about '{}' (intensity: {:.2})", domain, intensity));
-                        
+                    DriveEvent::Curiosity {
+                        domain, intensity, ..
+                    } => {
+                        self.log(&format!(
+                            "🔍 Curiosity about '{}' (intensity: {:.2})",
+                            domain, intensity
+                        ));
+
                         // In real implementation: explore the domain
                         Some(ConsciousAction::Observe {
                             target: domain.clone(),
                         })
                     }
-                    DriveEvent::Boredom { level, recommendation } => {
-                        self.log(&format!("😴 Bored (level: {:.2}) - {}", level, recommendation));
-                        
+                    DriveEvent::Boredom {
+                        level,
+                        recommendation,
+                    } => {
+                        self.log(&format!(
+                            "😴 Bored (level: {:.2}) - {}",
+                            level, recommendation
+                        ));
+
                         // Take the recommended action
                         match recommendation.as_str() {
-                            "increase_exploration" => {
-                                Some(ConsciousAction::Observe {
-                                    target: "something_new".to_string(),
-                                })
-                            }
-                            "switch_strategy" => {
-                                Some(ConsciousAction::Refocus {
-                                    target: "different_approach".to_string(),
-                                    reason: "boredom".to_string(),
-                                })
-                            }
-                            "seek_help" => {
-                                Some(ConsciousAction::RequestInput {
-                                    prompt: "I'm stuck. What should I explore?".to_string(),
-                                })
-                            }
-                            _ => {
-                                Some(ConsciousAction::Think {
-                                    thought: "Maybe I should try something different...".to_string(),
-                                })
-                            }
+                            "increase_exploration" => Some(ConsciousAction::Observe {
+                                target: "something_new".to_string(),
+                            }),
+                            "switch_strategy" => Some(ConsciousAction::Refocus {
+                                target: "different_approach".to_string(),
+                                reason: "boredom".to_string(),
+                            }),
+                            "seek_help" => Some(ConsciousAction::RequestInput {
+                                prompt: "I'm stuck. What should I explore?".to_string(),
+                            }),
+                            _ => Some(ConsciousAction::Think {
+                                thought: "Maybe I should try something different...".to_string(),
+                            }),
                         }
                     }
-                    DriveEvent::GoalPressure { reason, urgency, .. } => {
-                        self.log(&format!("🎯 Goal pressure: {} (urgency: {:.2})", reason, urgency));
+                    DriveEvent::GoalPressure {
+                        reason, urgency, ..
+                    } => {
+                        self.log(&format!(
+                            "🎯 Goal pressure: {} (urgency: {:.2})",
+                            reason, urgency
+                        ));
                         Some(ConsciousAction::Refocus {
                             target: reason.clone(),
                             reason: "goal_deadline".to_string(),
@@ -200,7 +218,8 @@ impl StimulusProcessor for AutonomousProcessor {
                         self.log(&format!("💤 Idle for {} seconds", idle_seconds));
                         // Might trigger exploration
                         Some(ConsciousAction::Think {
-                            thought: "Been idle for a while, maybe I should do something...".to_string(),
+                            thought: "Been idle for a while, maybe I should do something..."
+                                .to_string(),
                         })
                     }
                     digital_brain::core::TimeEvent::Alarm { name } => {
@@ -214,17 +233,27 @@ impl StimulusProcessor for AutonomousProcessor {
             }
 
             // Internal thought
-            StimulusKind::InternalThought { content, source_region } => {
+            StimulusKind::InternalThought {
+                content,
+                source_region,
+            } => {
                 self.log(&format!("💭 Thought from {}: {}", source_region, content));
                 self.thoughts.push(content.clone());
                 None
             }
 
             // Observation result
-            StimulusKind::Observation { domain, content, novelty } => {
-                self.log(&format!("👁️ Observed {} (novelty: {:.2}): {}", domain, novelty, content));
+            StimulusKind::Observation {
+                domain,
+                content,
+                novelty,
+            } => {
+                self.log(&format!(
+                    "👁️ Observed {} (novelty: {:.2}): {}",
+                    domain, novelty, content
+                ));
                 self.observations.push(content.clone());
-                
+
                 if *novelty > 0.7 {
                     // High novelty - record it
                     if let Ok(mut boredom) = self.boredom.lock() {
@@ -255,7 +284,7 @@ impl StimulusProcessor for AutonomousProcessor {
 
         let idx = (context.cycle as usize) % thoughts.len();
         let thought = thoughts[idx].to_string();
-        
+
         self.log(&format!("🧠 Mind wandering: {}", thought));
         self.thoughts.push(thought.clone());
 
@@ -339,8 +368,8 @@ async fn main() {
 
     // Add clock stream (ticks, idle detection)
     let clock = ClockStream::new(ClockConfig {
-        tick_interval_ms: 1000,  // 1 second ticks
-        idle_timeout_secs: 30,   // Idle after 30 seconds
+        tick_interval_ms: 1000, // 1 second ticks
+        idle_timeout_secs: 30,  // Idle after 30 seconds
     });
     sensory.add_stream(Box::new(clock));
 
@@ -370,13 +399,13 @@ async fn main() {
 
     // Create consciousness loop
     let config = ConsciousnessConfig {
-        cycle_interval_ms: 100,        // 10 Hz
+        cycle_interval_ms: 100, // 10 Hz
         max_stimuli_per_cycle: 5,
         autonomous: true,
         attention_threshold: 0.2,
         focus_duration_cycles: 50,
         enable_mind_wandering: true,
-        idle_threshold_cycles: 100,    // Mind-wander after 10 seconds idle
+        idle_threshold_cycles: 100, // Mind-wander after 10 seconds idle
     };
 
     let mut consciousness = ConsciousnessLoop::new(config, sensory, Box::new(processor));
@@ -402,7 +431,10 @@ async fn main() {
         loop {
             tokio::time::sleep(Duration::from_secs(15)).await;
             let filename = format!("test_file_{}.txt", chrono::Utc::now().timestamp());
-            if let Ok(_) = tokio::fs::write(&filename, "Hello from the test!").await {
+            if tokio::fs::write(&filename, "Hello from the test!")
+                .await
+                .is_ok()
+            {
                 println!("\n[Test] Created file: {}", filename);
                 // Clean up after a bit
                 tokio::time::sleep(Duration::from_secs(5)).await;

@@ -25,13 +25,11 @@
 //! - High cognitive load (need to consolidate)
 //! - Time-based (circadian-like rhythm)
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
-use crate::core::imagination::{
-    DreamResult, Imagining, ImaginationEngine, ImaginationType, MemorySource,
-};
+use crate::core::imagination::{ImaginationEngine, Imagining, MemorySource};
 use crate::core::llm::LlmBackend;
 
 /// Sleep stages
@@ -322,7 +320,9 @@ impl<L: LlmBackend> SleepSystem<L> {
                     self.transition_to(SleepStage::RemDream);
                 }
 
-                SleepTickResult::Consolidated { count: consolidated }
+                SleepTickResult::Consolidated {
+                    count: consolidated,
+                }
             }
 
             SleepStage::RemDream => {
@@ -422,11 +422,7 @@ impl<L: LlmBackend> SleepSystem<L> {
         match result {
             Ok(dream_result) => {
                 // Calculate dream properties
-                let vividness = dream_result
-                    .sequence
-                    .iter()
-                    .map(|i| i.novelty)
-                    .sum::<f64>()
+                let vividness = dream_result.sequence.iter().map(|i| i.novelty).sum::<f64>()
                     / dream_result.sequence.len().max(1) as f64;
 
                 let valence = dream_result

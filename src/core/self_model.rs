@@ -16,7 +16,7 @@
 //! 4. **Autobiographical Self**: The narrative "I" across time
 //! 5. **Theory of Mind**: Understanding that others have minds too
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use uuid::Uuid;
@@ -144,10 +144,14 @@ impl SelfConcept {
         }
 
         // Weighted average of trait valences
-        let total: f64 = self.traits.values()
+        let total: f64 = self
+            .traits
+            .values()
             .map(|t| t.valence * t.centrality * t.confidence)
             .sum();
-        let weight: f64 = self.traits.values()
+        let weight: f64 = self
+            .traits
+            .values()
             .map(|t| t.centrality * t.confidence)
             .sum();
 
@@ -162,7 +166,10 @@ impl SelfConcept {
         let mut consistency = 0.5; // Neutral baseline
 
         for trait_ in self.traits.values() {
-            if behavior.to_lowercase().contains(&trait_.name.to_lowercase()) {
+            if behavior
+                .to_lowercase()
+                .contains(&trait_.name.to_lowercase())
+            {
                 consistency += trait_.valence * trait_.centrality * 0.2;
             }
         }
@@ -253,7 +260,8 @@ impl MetacognitiveMonitor {
 
     /// Record a confidence judgment and outcome
     pub fn record_judgment(&mut self, confidence: f64, was_correct: bool) {
-        self.calibration_history.push_back((confidence, was_correct));
+        self.calibration_history
+            .push_back((confidence, was_correct));
         if self.calibration_history.len() > 100 {
             self.calibration_history.pop_front();
         }
@@ -434,10 +442,10 @@ impl AutobiographicalSelf {
     /// Start a new life chapter
     pub fn start_chapter(&mut self, name: impl Into<String>, theme: impl Into<String>) {
         // End current chapter if any
-        if let Some(current) = self.chapters.last_mut() {
-            if current.ended.is_none() {
-                current.ended = Some(Utc::now());
-            }
+        if let Some(current) = self.chapters.last_mut()
+            && current.ended.is_none()
+        {
+            current.ended = Some(Utc::now());
         }
 
         let chapter = LifeChapter {
@@ -475,10 +483,7 @@ impl AutobiographicalSelf {
         }
 
         let theme_str: Vec<_> = themes.iter().map(|(t, _)| t.as_str()).collect();
-        self.narrative_gist = Some(format!(
-            "A story of {}",
-            theme_str.join(", ")
-        ));
+        self.narrative_gist = Some(format!("A story of {}", theme_str.join(", ")));
     }
 }
 
@@ -584,7 +589,9 @@ impl SelfModel {
 
     /// Get a summary of self
     pub fn self_summary(&self) -> String {
-        let traits: Vec<_> = self.concept.core_traits()
+        let traits: Vec<_> = self
+            .concept
+            .core_traits()
             .iter()
             .map(|t| t.name.as_str())
             .collect();
@@ -631,7 +638,7 @@ mod tests {
     #[test]
     fn test_self_concept() {
         let mut concept = SelfConcept::new();
-        
+
         concept.add_trait(SelfTrait::new("intelligent", 0.7).with_centrality(0.8));
         concept.add_trait(SelfTrait::new("kind", 0.9).with_centrality(0.9));
 
@@ -644,7 +651,7 @@ mod tests {
         let mut monitor = MetacognitiveMonitor::new();
 
         // Record some judgments
-        monitor.record_judgment(0.8, true);  // 80% confident, correct
+        monitor.record_judgment(0.8, true); // 80% confident, correct
         monitor.record_judgment(0.8, true);
         monitor.record_judgment(0.8, false); // 80% confident, wrong
         monitor.record_judgment(0.3, false); // 30% confident, wrong (correct!)
@@ -675,15 +682,17 @@ mod tests {
     fn test_self_model() {
         let mut self_model = SelfModel::new();
 
-        self_model.concept.add_trait(
-            SelfTrait::new("persistent", 0.7).with_centrality(0.8)
-        );
+        self_model
+            .concept
+            .add_trait(SelfTrait::new("persistent", 0.7).with_centrality(0.8));
 
-        self_model.autobiography.start_chapter("Building", "creation");
+        self_model
+            .autobiography
+            .start_chapter("Building", "creation");
 
         self_model.process_self_info("Completed a major project", 0.8);
 
-        assert!(self_model.autobiography.events.len() > 0);
+        assert!(!self_model.autobiography.events.is_empty());
 
         let summary = self_model.self_summary();
         assert!(summary.contains("persistent"));
@@ -692,7 +701,7 @@ mod tests {
     #[test]
     fn test_inner_speech() {
         let mut self_model = SelfModel::new();
-        
+
         // Low confidence should generate uncertain speech
         self_model.metacognition.current.confidence = 0.2;
         let speech = self_model.inner_speech();

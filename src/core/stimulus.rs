@@ -14,11 +14,14 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 /// Priority level for stimulus processing
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize,
+)]
 pub enum StimulusPriority {
     /// Background processing, can be deferred
     Background = 0,
     /// Normal priority, process when convenient
+    #[default]
     Normal = 1,
     /// Elevated priority, should process soon
     Elevated = 2,
@@ -26,12 +29,6 @@ pub enum StimulusPriority {
     High = 3,
     /// Critical, must process immediately
     Critical = 4,
-}
-
-impl Default for StimulusPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// The source of a stimulus
@@ -93,10 +90,7 @@ pub enum DriveEvent {
         target: Option<String>,
     },
     /// Boredom trigger - stuck in a rut
-    Boredom {
-        level: f64,
-        recommendation: String,
-    },
+    Boredom { level: f64, recommendation: String },
     /// Goal pressure - something needs attention
     GoalPressure {
         goal_id: Uuid,
@@ -109,9 +103,7 @@ pub enum DriveEvent {
         last_consolidation: Option<DateTime<Utc>>,
     },
     /// Rest need - resources depleted
-    RestNeed {
-        fatigue_level: f64,
-    },
+    RestNeed { fatigue_level: f64 },
     /// Social need - want interaction
     SocialNeed {
         isolation_duration: std::time::Duration,
@@ -159,34 +151,34 @@ pub enum StimulusKind {
         content: String,
         context: Option<String>,
     },
-    
+
     /// File system event
     FileSystem(FileEvent),
-    
+
     /// Time-based event
     Time(TimeEvent),
-    
+
     /// Internal drive event
     Drive(DriveEvent),
-    
+
     /// Goal-related event
     Goal(GoalEvent),
-    
+
     /// System event
     System(SystemEvent),
-    
+
     /// Internal thought (from DMN, reflection, etc.)
     InternalThought {
         content: String,
         source_region: String,
     },
-    
+
     /// Query response (async result came back)
     QueryResponse {
         query_id: Uuid,
         result: serde_json::Value,
     },
-    
+
     /// Sensory observation (noticed something)
     Observation {
         domain: String,
@@ -470,11 +462,11 @@ mod tests {
 
     #[test]
     fn test_interrupt_logic() {
-        let critical = Stimulus::from_prompt("urgent", None)
-            .with_priority(StimulusPriority::Critical);
-        
-        let normal = Stimulus::from_thought("thinking", "dmn")
-            .with_priority(StimulusPriority::Normal);
+        let critical =
+            Stimulus::from_prompt("urgent", None).with_priority(StimulusPriority::Critical);
+
+        let normal =
+            Stimulus::from_thought("thinking", "dmn").with_priority(StimulusPriority::Normal);
 
         assert!(critical.should_interrupt(StimulusPriority::Normal));
         assert!(critical.should_interrupt(StimulusPriority::High));
