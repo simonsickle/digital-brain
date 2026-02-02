@@ -256,6 +256,8 @@ impl Brain {
             None
         };
 
+        self.update_sensory_schemas(&content, &cortical_features, multimodal_context.as_ref());
+
         // 3. Emotional tagging by amygdala
         // Record signal flowing to amygdala via nervous system
         self.nervous_system.transmit(
@@ -620,6 +622,83 @@ impl Brain {
         }
 
         outputs
+    }
+
+    fn update_sensory_schemas(
+        &mut self,
+        content: &str,
+        cortical_features: &[CorticalRepresentation],
+        multimodal_context: Option<&MultimodalContext>,
+    ) {
+        let episode_id = self.cycle_count.saturating_add(1);
+        let mut seeds: Vec<(String, Vec<String>)> = Vec::new();
+
+        if let Some(context) = multimodal_context
+            && context.confidence >= 0.45
+        {
+            let anchor_summary = if context.anchors.is_empty() {
+                context
+                    .modalities
+                    .iter()
+                    .map(|m| m.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            } else {
+                context.anchors.join(", ")
+            };
+
+            let pattern = format!(
+                "When sensory context includes {}, expect multimodal binding",
+                anchor_summary
+            );
+
+            let mut triggers = Vec::new();
+            triggers.extend(context.anchors.clone());
+            triggers.extend(context.modalities.iter().map(|m| m.to_string()));
+            triggers.push("context".to_string());
+            triggers.push("multimodal".to_string());
+            seeds.push((pattern, dedupe_strings(triggers)));
+        }
+
+        for rep in cortical_features.iter().take(3) {
+            if rep.confidence < 0.4 {
+                continue;
+            }
+
+            let primary = rep
+                .primary_focus
+                .clone()
+                .or_else(|| rep.detected_features.first().cloned())
+                .unwrap_or_else(|| format!("{}", rep.modality));
+
+            let pattern = format!(
+                "When {} cues include {}, expect {} features",
+                rep.modality, primary, rep.modality
+            );
+
+            let mut triggers = Vec::new();
+            triggers.push(rep.modality.to_string());
+            triggers.extend(feature_triggers(&primary));
+            for feature in rep.detected_features.iter().take(2) {
+                triggers.extend(feature_triggers(feature));
+            }
+            if !content.is_empty() {
+                triggers.push("sensory".to_string());
+            }
+            seeds.push((pattern, dedupe_strings(triggers)));
+        }
+
+        for (pattern, triggers) in seeds {
+            if triggers.is_empty() {
+                continue;
+            }
+            self.schemas.upsert_pattern(
+                &pattern,
+                SchemaCategory::Conditional,
+                episode_id,
+                triggers,
+            );
+        }
     }
 
     /// Recall memories related to a query.
@@ -1460,6 +1539,36 @@ impl Brain {
     }
 }
 
+fn feature_triggers(feature: &str) -> Vec<String> {
+    let trimmed = feature.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    let mut triggers = Vec::new();
+    triggers.push(trimmed.to_string());
+    if let Some((prefix, value)) = trimmed.split_once(':') {
+        if !prefix.is_empty() {
+            triggers.push(prefix.to_string());
+        }
+        if !value.is_empty() {
+            triggers.push(value.to_string());
+        }
+    }
+    triggers
+}
+
+fn dedupe_strings(values: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut deduped = Vec::new();
+    for value in values {
+        if seen.insert(value.clone()) {
+            deduped.push(value);
+        }
+    }
+    deduped
+}
+
 impl Default for Brain {
     fn default() -> Self {
         Self::new().expect("Failed to create default brain")
@@ -1678,6 +1787,21 @@ mod tests {
         // Verify identity was set
         let who = brain.who_am_i();
         assert!(who.contains("Rata"));
+    }
+
+    #[test]
+    fn test_sensory_schema_learning() {
+        let mut brain = Brain::new().unwrap();
+
+        brain
+            .process("A bright red circle appears while soft music plays")
+            .unwrap();
+
+        let schemas = brain.find_schemas("red");
+        assert!(
+            !schemas.is_empty(),
+            "Expected sensory schema to be created from cortical features"
+        );
     }
 
     #[test]

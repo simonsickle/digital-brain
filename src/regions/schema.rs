@@ -196,15 +196,64 @@ impl SchemaStore {
         triggers: Vec<&str>,
     ) -> u64 {
         let id = self.create(pattern, category);
+        let mut triggers_to_index = Vec::new();
         if let Some(schema) = self.schemas.get_mut(&id) {
             schema.add_support(episode_id);
             for trigger in triggers {
                 schema.add_trigger(trigger);
-                self.trigger_index
-                    .entry(trigger.to_lowercase())
-                    .or_default()
-                    .push(id);
+                triggers_to_index.push(trigger.to_string());
             }
+        }
+        for trigger in triggers_to_index {
+            self.index_trigger(&trigger, id);
+        }
+        id
+    }
+
+    /// Find a schema ID by exact pattern match.
+    pub fn find_id_by_pattern(&self, pattern: &str) -> Option<u64> {
+        self.schemas
+            .iter()
+            .find_map(|(id, schema)| (schema.pattern == pattern).then_some(*id))
+    }
+
+    /// Upsert a schema from a pattern and triggers.
+    pub fn upsert_pattern(
+        &mut self,
+        pattern: &str,
+        category: SchemaCategory,
+        episode_id: u64,
+        triggers: Vec<String>,
+    ) -> u64 {
+        if let Some(id) = self.find_id_by_pattern(pattern) {
+            let mut triggers_to_index = Vec::new();
+            if let Some(schema) = self.schemas.get_mut(&id) {
+                schema.add_support(episode_id);
+                for trigger in triggers {
+                    let was_present = schema.triggers.contains(&trigger);
+                    schema.add_trigger(&trigger);
+                    if !was_present {
+                        triggers_to_index.push(trigger);
+                    }
+                }
+            }
+            for trigger in triggers_to_index {
+                self.index_trigger(&trigger, id);
+            }
+            return id;
+        }
+
+        let id = self.create(pattern, category);
+        let mut triggers_to_index = Vec::new();
+        if let Some(schema) = self.schemas.get_mut(&id) {
+            schema.add_support(episode_id);
+            for trigger in triggers {
+                schema.add_trigger(&trigger);
+                triggers_to_index.push(trigger);
+            }
+        }
+        for trigger in triggers_to_index {
+            self.index_trigger(&trigger, id);
         }
         id
     }
@@ -284,6 +333,16 @@ impl SchemaStore {
         // Record retrieval
         if let Some(schema) = self.schemas.get_mut(&id) {
             schema.record_retrieval();
+        }
+    }
+
+    fn index_trigger(&mut self, trigger: &str, id: u64) {
+        let entry = self
+            .trigger_index
+            .entry(trigger.to_lowercase())
+            .or_default();
+        if !entry.contains(&id) {
+            entry.push(id);
         }
     }
 

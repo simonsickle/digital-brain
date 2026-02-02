@@ -24,7 +24,9 @@ use crate::agent::{
     Percept,
 };
 use crate::brain::{Brain, BrainConfig, ProcessingResult, SleepReport};
-use crate::core::{ActionTemplate, CuriositySystem, Domain, Entity, Goal, GoalId, WorldModel};
+use crate::core::{
+    ActionTemplate, CuriositySystem, Domain, Entity, Goal, GoalId, PropertyValue, WorldModel,
+};
 use crate::error::Result;
 
 /// Configuration for the brain-agent
@@ -248,7 +250,112 @@ impl BrainAgent {
     pub fn process(&mut self, input: &str) -> Result<ProcessingResult> {
         let result = self.brain.process(input)?;
         self.stats.total_inputs_processed += 1;
+        self.update_world_model_from_processing(input, &result);
         Ok(result)
+    }
+
+    fn update_world_model_from_processing(&mut self, input: &str, result: &ProcessingResult) {
+        let Some(world) = self.world.as_mut() else {
+            return;
+        };
+
+        let (modalities, features, anchors, binding_strength, novelty, detail_level, confidence) =
+            if let Some(context) = &result.multimodal_context {
+                (
+                    context.modalities.iter().map(|m| m.to_string()).collect(),
+                    context.integrated_features.clone(),
+                    context.anchors.clone(),
+                    context.binding_strength,
+                    context.novelty,
+                    context.detail_level,
+                    context.confidence,
+                )
+            } else {
+                let modalities: Vec<String> = result
+                    .cortical_features
+                    .iter()
+                    .map(|rep| rep.modality.to_string())
+                    .collect();
+                let mut features = Vec::new();
+                let mut anchors = Vec::new();
+                let mut confidence_sum = 0.0;
+                let mut novelty_sum = 0.0;
+                let mut detail_sum = 0.0;
+
+                for rep in &result.cortical_features {
+                    for feature in rep.detected_features.iter().take(3) {
+                        features.push(format!("{}:{}", rep.modality, feature));
+                    }
+                    if let Some(primary) = rep.primary_focus.clone() {
+                        anchors.push(primary);
+                    }
+                    confidence_sum += rep.confidence;
+                    novelty_sum += rep.novelty;
+                    detail_sum += rep.detail_level;
+                }
+
+                let count = result.cortical_features.len().max(1) as f64;
+                (
+                    modalities,
+                    features,
+                    anchors,
+                    0.0,
+                    novelty_sum / count,
+                    detail_sum / count,
+                    confidence_sum / count,
+                )
+            };
+
+        if modalities.is_empty() && features.is_empty() {
+            return;
+        }
+
+        let scene_name = "current_scene";
+        let existing = world.find_by_name(scene_name);
+        let entity_id = if let Some(entity) = existing.first() {
+            entity.id
+        } else {
+            let mut entity = Entity::new("percept", scene_name)
+                .with_property("source", "sensory")
+                .with_confidence(confidence)
+                .with_valence(result.tagged_signal.valence.value());
+            if result.multimodal_context.is_some() {
+                entity = entity.with_tag("multimodal");
+            } else {
+                entity = entity.with_tag("sensory");
+            }
+            for modality in &modalities {
+                entity = entity.with_tag(modality);
+            }
+            world.add_entity(entity)
+        };
+
+        let modalities = unique_strings(modalities);
+        let features = unique_strings(features);
+        let anchors = unique_strings(anchors);
+
+        world.update_entity_property(entity_id, "modalities", property_list(&modalities));
+        world.update_entity_property(entity_id, "features", property_list(&features));
+        world.update_entity_property(entity_id, "anchors", property_list(&anchors));
+        world.update_entity_property(entity_id, "binding_strength", binding_strength);
+        world.update_entity_property(entity_id, "novelty", novelty);
+        world.update_entity_property(entity_id, "detail_level", detail_level);
+        world.update_entity_property(entity_id, "confidence", confidence);
+        world.update_entity_property(entity_id, "last_input", input);
+        world.update_entity_property(entity_id, "salience", result.tagged_signal.salience.value());
+        world.update_entity_property(entity_id, "arousal", result.tagged_signal.arousal.value());
+        world.update_entity_property(entity_id, "valence", result.tagged_signal.valence.value());
+
+        if let Some(entity) = world.get_entity_mut(entity_id) {
+            entity.valence = result.tagged_signal.valence;
+            entity.confidence = confidence;
+            entity.tags = modalities;
+            entity.tags.push(if result.multimodal_context.is_some() {
+                "multimodal".to_string()
+            } else {
+                "sensory".to_string()
+            });
+        }
     }
 
     /// Run a single cycle of the brain-agent
@@ -315,7 +422,9 @@ impl BrainAgent {
         self.agent.perceive(Percept::text(input));
 
         // Also process through brain (ignore errors)
-        let _ = self.brain.process(input).ok();
+        if let Ok(result) = self.brain.process(input) {
+            self.update_world_model_from_processing(input, &result);
+        }
         self.stats.total_inputs_processed += 1;
     }
 
@@ -395,6 +504,21 @@ impl Default for BrainAgent {
     fn default() -> Self {
         Self::new().expect("Failed to create default BrainAgent")
     }
+}
+
+fn property_list(values: &[String]) -> PropertyValue {
+    PropertyValue::List(values.iter().cloned().map(PropertyValue::String).collect())
+}
+
+fn unique_strings(values: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut deduped = Vec::new();
+    for value in values {
+        if seen.insert(value.clone()) {
+            deduped.push(value);
+        }
+    }
+    deduped
 }
 
 // ============================================================================
@@ -496,6 +620,22 @@ mod tests {
 
         assert!(id.is_some());
         assert!(agent.world().unwrap().get_entity(id.unwrap()).is_some());
+    }
+
+    #[test]
+    fn test_brain_agent_world_model_updates_from_sensory() {
+        let mut agent = BrainAgent::new().unwrap();
+
+        agent
+            .process("A bright red circle appears while soft music plays")
+            .unwrap();
+
+        let world = agent.world().expect("world model should be enabled");
+        let scenes = world.find_by_name("current_scene");
+        assert!(!scenes.is_empty());
+        let scene = scenes[0];
+        assert!(scene.get_property("modalities").is_some());
+        assert!(scene.get_property("features").is_some());
     }
 
     #[test]
