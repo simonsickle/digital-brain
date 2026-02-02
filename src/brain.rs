@@ -6,6 +6,7 @@
 use crate::core::attention::{
     AttentionBudget, AttentionStats, TaskComplexity, estimate_complexity,
 };
+use crate::core::emotion::{ActionTendency, Appraisal, EmotionSystem, RegulationStrategy};
 use crate::core::nervous_system::{BrainRegion, NervousSystem, NervousSystemStats};
 use crate::core::neuromodulators::{
     NeuromodulatorState, NeuromodulatorySystem, RewardCategory, RewardQuality,
@@ -121,6 +122,8 @@ pub struct Brain {
     pub thalamus: Thalamus,
     /// Emotional processing
     pub amygdala: Amygdala,
+    /// Rich emotion system (appraisal, mood, regulation)
+    pub emotion_system: EmotionSystem,
     /// Long-term memory
     pub hippocampus: HippocampusStore,
     /// Working memory
@@ -208,6 +211,7 @@ impl Brain {
         Ok(Self {
             thalamus: Thalamus::new(),
             amygdala: Amygdala::new(),
+            emotion_system: EmotionSystem::new(),
             hippocampus,
             prefrontal,
             workspace,
@@ -454,14 +458,26 @@ impl Brain {
             }
         }
 
+        let appraisal =
+            self.build_emotional_appraisal(&tagged_signal, &emotion, &prediction_errors);
+        if let Ok(value) = serde_json::to_value(&appraisal) {
+            tagged_signal
+                .metadata
+                .insert("emotion_appraisal".to_string(), value);
+        }
+        self.emotion_system
+            .process_event(&appraisal, Some(&content));
+        if let Some(strategy) = self.emotion_system.regulate() {
+            self.apply_emotion_regulation(strategy);
+        }
+        self.apply_emotion_to_neuromodulators();
+
         // 4. Update DMN emotional state
-        self.dmn
-            .update_emotional_state(tagged_signal.valence.value());
+        let mood_valence = self.emotion_system.mood.valence();
+        self.dmn.update_emotional_state(mood_valence);
 
         // Update serotonin mood tracking
-        self.neuromodulators
-            .serotonin
-            .record_mood(tagged_signal.valence.value());
+        self.neuromodulators.serotonin.record_mood(mood_valence);
 
         // 5. Route to appropriate modules
         for dest in &routed.destinations {
@@ -910,6 +926,8 @@ impl Brain {
             self.nervous_system
                 .transmit(BrainRegion::Brainstem, BrainRegion::Hypothalamus, signal);
         }
+
+        self.emotion_system.decay();
     }
 
     fn build_interoceptive_alert(
@@ -1002,6 +1020,152 @@ impl Brain {
     fn record_interoceptive_alert(&mut self, alert: &InteroceptiveAlert) {
         self.last_interoceptive_alert = Some(alert.summary.clone());
         self.last_interoceptive_alert_cycle = self.cycle_count;
+    }
+
+    fn build_emotional_appraisal(
+        &self,
+        signal: &BrainSignal,
+        emotion: &EmotionalAppraisal,
+        prediction_errors: &[PredictionError],
+    ) -> Appraisal {
+        let body_valence = self.insula.body_state.valence();
+        let valence = (emotion.valence.value() * 0.8 + body_valence * 0.2).clamp(-1.0, 1.0);
+        let mut relevance = (signal.salience.value() * 1.2 - 0.3).clamp(-1.0, 1.0);
+        if emotion.is_significant {
+            relevance = relevance.max(0.4);
+        }
+
+        let avg_surprise = if prediction_errors.is_empty() {
+            0.2
+        } else {
+            prediction_errors.iter().map(|e| e.surprise).sum::<f64>()
+                / prediction_errors.len() as f64
+        };
+        let avg_error = if prediction_errors.is_empty() {
+            0.2
+        } else {
+            prediction_errors
+                .iter()
+                .map(|e| e.error_magnitude)
+                .sum::<f64>()
+                / prediction_errors.len() as f64
+        };
+
+        let expectedness = (1.0 - avg_surprise).clamp(0.0, 1.0);
+        let certainty = (1.0 - avg_error).clamp(0.0, 1.0);
+        let coping_potential = (1.0 - self.hypothalamus.stress.level()).clamp(0.0, 1.0);
+        let agency = if signal.source.contains("self") || signal.source.contains("internal") {
+            0.6
+        } else if signal.source.contains("external") {
+            -0.3
+        } else {
+            0.0
+        };
+        let attention_demand =
+            (signal.salience.value() * 0.7 + self.acc.cognitive_load() * 0.3).clamp(0.0, 1.0);
+
+        Appraisal {
+            relevance,
+            valence,
+            expectedness,
+            coping_potential,
+            agency,
+            certainty,
+            attention_demand,
+        }
+    }
+
+    fn apply_emotion_to_neuromodulators(&mut self) {
+        let state = &self.emotion_system.state;
+        let intensity = state.intensity;
+        let valence = state.affect.valence;
+        let arousal = state.affect.arousal;
+
+        self.neuromodulators
+            .dopamine
+            .level
+            .adjust(valence * intensity * 0.08);
+        self.neuromodulators
+            .serotonin
+            .level
+            .adjust(valence * intensity * 0.05);
+        self.neuromodulators
+            .norepinephrine
+            .level
+            .adjust(arousal * intensity * 0.06);
+
+        if valence < -0.2 && intensity > 0.6 {
+            self.neuromodulators
+                .cortisol
+                .signal_failure(Some(&format!("{:?}", state.dominant_emotion)));
+        } else if valence > 0.2 && intensity > 0.5 {
+            self.neuromodulators.cortisol.signal_success();
+        }
+
+        match state.action_tendency() {
+            ActionTendency::Approach
+            | ActionTendency::Explore
+            | ActionTendency::Connect
+            | ActionTendency::Acquire => {
+                self.neuromodulators.dopamine.level.adjust(0.04 * intensity);
+            }
+            ActionTendency::Withdraw
+            | ActionTendency::Escape
+            | ActionTendency::Hide
+            | ActionTendency::Reject
+            | ActionTendency::Protect => {
+                self.neuromodulators.gaba.level.adjust(0.06 * intensity);
+                self.neuromodulators
+                    .norepinephrine
+                    .signal_threat(0.2 * intensity);
+            }
+            ActionTendency::Attend | ActionTendency::Monitor => {
+                self.neuromodulators
+                    .norepinephrine
+                    .level
+                    .adjust(0.03 * intensity);
+            }
+            _ => {}
+        }
+    }
+
+    fn apply_emotion_regulation(&mut self, strategy: RegulationStrategy) {
+        match strategy {
+            RegulationStrategy::SituationModification => {
+                self.neuromodulators.dopamine.level.adjust(0.05);
+            }
+            RegulationStrategy::AttentionalDeployment => {
+                self.thalamus
+                    .focus_attention("emotion_regulation".to_string());
+                self.neuromodulators.norepinephrine.signal_safety();
+            }
+            RegulationStrategy::CognitiveReappraisal => {
+                self.neuromodulators.serotonin.level.adjust(0.05);
+                self.neuromodulators
+                    .acetylcholine
+                    .signal_deep_processing(0.2);
+            }
+            RegulationStrategy::ExpressionSuppression => {
+                self.neuromodulators.gaba.level.adjust(0.08);
+            }
+            RegulationStrategy::Acceptance => {
+                self.neuromodulators.serotonin.level.adjust(0.03);
+                self.neuromodulators.norepinephrine.signal_safety();
+            }
+            RegulationStrategy::ProblemSolving => {
+                self.neuromodulators
+                    .acetylcholine
+                    .signal_deep_processing(0.3);
+            }
+            RegulationStrategy::SocialSupport => {
+                self.neuromodulators
+                    .oxytocin
+                    .record_positive_interaction("self_support");
+            }
+            RegulationStrategy::Distraction => {
+                self.neuromodulators.dopamine.level.adjust(0.02);
+            }
+        }
     }
 
     fn apply_autonomic_feedback(&mut self, feedback: &AutonomicFeedback) {
@@ -2059,6 +2223,7 @@ impl Brain {
     /// Creates or overwrites:
     /// - `brain_meta.json` (cycle count, timestamp)
     /// - `neuromodulators.json` (current neuromodulator levels)
+    /// - `emotion_state.json` (mood baseline + regulation state)
     /// - `who_am_i.txt` (identity description)
     ///
     /// Note: For full memory persistence, use BrainConfig with memory_path set
@@ -2074,6 +2239,13 @@ impl Brain {
         let neuro_state = self.neuromodulators.state();
         let neuro_path = dir.join("neuromodulators.json");
         fs::write(&neuro_path, serde_json::to_string_pretty(&neuro_state)?)?;
+
+        // Save emotion system state (mood baseline + regulation)
+        let emotion_path = dir.join("emotion_state.json");
+        fs::write(
+            &emotion_path,
+            serde_json::to_string_pretty(&self.emotion_system)?,
+        )?;
 
         // Save brain metadata
         let meta = serde_json::json!({
@@ -2123,6 +2295,14 @@ impl Brain {
 
             if let Some(cycles) = meta.get("cycle_count").and_then(|v| v.as_u64()) {
                 brain.cycle_count = cycles;
+            }
+        }
+
+        let emotion_path = dir.join("emotion_state.json");
+        if emotion_path.exists() {
+            let emotion_json = fs::read_to_string(&emotion_path)?;
+            if let Ok(state) = serde_json::from_str::<EmotionSystem>(&emotion_json) {
+                brain.emotion_system = state;
             }
         }
 
@@ -2304,6 +2484,21 @@ mod tests {
             .process("Terrible failure, everything is bad")
             .unwrap();
         assert!(result.emotion.valence.is_negative());
+    }
+
+    #[test]
+    fn test_emotion_system_updates_from_processing() {
+        let mut brain = Brain::new().unwrap();
+
+        let _ = brain
+            .process("I feel terrified about this looming threat")
+            .unwrap();
+
+        assert!(brain.emotion_system.state.intensity > 0.1);
+        assert_ne!(
+            brain.emotion_system.state.dominant_emotion,
+            crate::core::emotion::EmotionCategory::Neutral
+        );
     }
 
     #[test]
@@ -2501,6 +2696,7 @@ mod tests {
         // Verify files exist
         assert!(std::path::Path::new(&format!("{}/brain_meta.json", temp_dir)).exists());
         assert!(std::path::Path::new(&format!("{}/neuromodulators.json", temp_dir)).exists());
+        assert!(std::path::Path::new(&format!("{}/emotion_state.json", temp_dir)).exists());
         assert!(std::path::Path::new(&format!("{}/who_am_i.txt", temp_dir)).exists());
 
         // Load from save

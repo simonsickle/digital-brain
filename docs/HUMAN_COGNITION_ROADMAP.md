@@ -9,9 +9,9 @@ Create a cognitive architecture indistinguishable from human cognition.
 - **Current coverage:** `src/regions/hypothalamus.rs` models homeostatic drives and circadian rhythms; `src/regions/insula.rs` tracks body state, interoception, and affective mirroring; sensory cortices (`src/regions/sensory_cortex.rs`) transform thalamic input into modality-specific features.
 - **Implemented:** Autonomic feedback now generates interoceptive alerts, feeds the salience/attention pathways, and surfaces bodily signals through the global workspace.
 
-### 2. Rich Emotional Life ⚠️ (iterating)
+### 2. Rich Emotional Life ✅
 - **Current coverage:** Discrete emotion appraisal lives in `src/core/emotion.rs` and the amygdala (`src/regions/amygdala.rs`), backed by neuromodulators for valence/arousal.
-- **Next focus:** Persist mood baselines, add regulation strategies, and link emotion trajectories to decision making.
+- **Implemented:** Mood baselines now drift persistently, regulation strategies shape neuromodulator responses, and emotion trajectories are wired into decision-relevant neuromodulator state and saved/loaded with the brain.
 
 ### 3. Self-Model & Metacognition ⚠️ (iterating)
 - **Current coverage:** The DMN (`src/regions/dmn.rs`) and self-model (`src/core/self_model.rs`) maintain identity, beliefs, and metacognitive traces.

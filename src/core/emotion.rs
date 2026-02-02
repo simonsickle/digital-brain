@@ -417,6 +417,12 @@ impl Mood {
         self.current = self.current.blend(&self.baseline, regulation_rate);
     }
 
+    /// Slowly adapt baseline toward persistent mood shifts
+    pub fn update_baseline(&mut self) {
+        let drift = (0.005 + (1.0 - self.stability) * 0.01).clamp(0.002, 0.03);
+        self.baseline = self.baseline.blend(&self.current, drift);
+    }
+
     /// Get overall mood valence
     pub fn valence(&self) -> f64 {
         self.current.valence
@@ -604,6 +610,7 @@ impl EmotionSystem {
 
         // Mood regulation
         self.mood.regulate();
+        self.mood.update_baseline();
     }
 
     /// Get current valence
@@ -743,5 +750,18 @@ mod tests {
 
         // Mood should amplify the negative emotion
         assert!(system.state.intensity > 0.3);
+    }
+
+    #[test]
+    fn test_mood_baseline_drifts() {
+        let mut mood = Mood::new();
+        mood.current = CoreAffect::new(0.8, 0.6);
+        let before = mood.baseline.valence;
+
+        for _ in 0..5 {
+            mood.update_baseline();
+        }
+
+        assert!(mood.baseline.valence > before);
     }
 }

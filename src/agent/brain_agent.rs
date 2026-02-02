@@ -258,6 +258,7 @@ impl BrainAgent {
         let result = self.brain.process(input)?;
         self.stats.total_inputs_processed += 1;
         self.update_world_model_from_processing(input, &result);
+        self.sync_neuromodulators_from_brain();
         Ok(result)
     }
 
@@ -375,6 +376,7 @@ impl BrainAgent {
         let mut sleep_report = None;
 
         self.update_strategy_from_state("cycle");
+        self.sync_neuromodulators_from_brain();
 
         // Sync neuromodulator state from brain to agent
         // (In a full implementation, the brain's neuromodulatory system
@@ -438,6 +440,7 @@ impl BrainAgent {
         // Also process through brain (ignore errors)
         if let Ok(result) = self.brain.process(input) {
             self.update_world_model_from_processing(input, &result);
+            self.sync_neuromodulators_from_brain();
         }
         self.stats.total_inputs_processed += 1;
         self.update_strategy_from_state("perception");
@@ -491,6 +494,11 @@ impl BrainAgent {
                 narrative.significance,
             );
         }
+    }
+
+    fn sync_neuromodulators_from_brain(&mut self) {
+        let state = self.brain.neuromodulators.state();
+        self.agent.set_neuromodulators(state);
     }
 
     /// Get statistics
