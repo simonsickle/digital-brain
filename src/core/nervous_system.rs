@@ -50,6 +50,7 @@ pub enum BrainRegion {
     GustatoryCortex,
     OlfactoryCortex,
     LanguageCortex,
+    TemporalCortex,
     PosteriorParietal,
     MotorCortex,
     Brainstem,
@@ -78,6 +79,7 @@ impl BrainRegion {
             BrainRegion::GustatoryCortex => "GustatoryCortex",
             BrainRegion::OlfactoryCortex => "OlfactoryCortex",
             BrainRegion::LanguageCortex => "LanguageCortex",
+            BrainRegion::TemporalCortex => "TemporalCortex",
             BrainRegion::PosteriorParietal => "PosteriorParietal",
             BrainRegion::MotorCortex => "MotorCortex",
             BrainRegion::Brainstem => "Brainstem",
@@ -281,6 +283,14 @@ impl NervousSystem {
             BrainRegion::LanguageCortex,
             0.85,
         ));
+        self.add_pathway(
+            Pathway::new(
+                BrainRegion::LanguageCortex,
+                BrainRegion::TemporalCortex,
+                0.8,
+            )
+            .with_signal_types(vec![SignalType::Memory, SignalType::Sensory]),
+        );
 
         // Thalamus → Posterior Parietal (multimodal integration gateway)
         self.add_pathway(Pathway::new(
@@ -375,6 +385,20 @@ impl NervousSystem {
             );
         }
 
+        // Temporal cortex → Prefrontal/DMN/Workspace (semantic insights)
+        self.add_pathway(
+            Pathway::new(BrainRegion::TemporalCortex, BrainRegion::Prefrontal, 0.7)
+                .with_signal_types(vec![SignalType::Memory, SignalType::Attention]),
+        );
+        self.add_pathway(
+            Pathway::new(BrainRegion::TemporalCortex, BrainRegion::DMN, 0.6)
+                .with_signal_types(vec![SignalType::Memory]),
+        );
+        self.add_pathway(
+            Pathway::new(BrainRegion::TemporalCortex, BrainRegion::Workspace, 0.6)
+                .with_signal_types(vec![SignalType::Memory, SignalType::Broadcast]),
+        );
+
         // Posterior Parietal → Workspace/Prefrontal/Hippocampus (bound context)
         self.add_pathway(
             Pathway::new(BrainRegion::PosteriorParietal, BrainRegion::Workspace, 0.9)
@@ -423,6 +447,7 @@ impl NervousSystem {
             BrainRegion::Hypothalamus,
             BrainRegion::Insula,
             BrainRegion::LanguageCortex,
+            BrainRegion::TemporalCortex,
         ] {
             self.add_pathway(
                 Pathway::new(BrainRegion::Workspace, region, 1.0)
@@ -477,6 +502,7 @@ impl NervousSystem {
             BrainRegion::GustatoryCortex,
             BrainRegion::OlfactoryCortex,
             BrainRegion::LanguageCortex,
+            BrainRegion::TemporalCortex,
             BrainRegion::PosteriorParietal,
             BrainRegion::MotorCortex,
             BrainRegion::Brainstem,

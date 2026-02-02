@@ -11,35 +11,41 @@ Human consciousness emerges from the *interaction* of specialized systems, not f
 
 ## Information Flow
 
+```mermaid
+flowchart TD
+    Input[Sensory Input] --> Thalamus[Thalamus\nGate + Routing]
+    Thalamus --> Amygdala[Amygdala\nValence + Arousal]
+    Thalamus --> Sensory[Visual / Auditory / Somatosensory\nSensory Cortices]
+    Thalamus --> PPC[Posterior Parietal\nMultimodal Binding]
+    Thalamus --> Language[Language Cortex\nIntent + Semantics]
+    Language --> Temporal[Temporal Cortex\nSemantic Associations]
+    Amygdala --> Workspace[Global Workspace\nConscious Broadcast]
+    PPC --> Workspace
+    Language --> Workspace
+    Temporal --> Workspace
+    Workspace --> Prefrontal[Prefrontal\nWorking Memory]
+    Workspace --> Hippocampus[Hippocampus\nMemory Encoding]
+    Prefrontal --> Actions[Action Selection\nBasal Ganglia + Motor Cortex]
+    Hippocampus --> Sleep[Sleep + Consolidation]
 ```
-Sensory Input
-     │
-     ▼
-┌─────────┐     ┌─────────┐
-│ THALAMUS│────▶│AMYGDALA │──── Emotional Tag
-│  Gate   │     │ Valence │
-└────┬────┘     └────┬────┘
-     │               │
-     ▼               ▼
-┌─────────────────────────┐
-│    GLOBAL WORKSPACE     │◀──── Competition for Access
-│   (Conscious Access)    │
-└───────────┬─────────────┘
-            │
-     ┌──────┴──────┐
-     ▼             ▼
-┌─────────┐  ┌───────────┐
-│PREFRONTAL│ │HIPPOCAMPUS│
-│ Working  │ │  Memory   │
-│ Memory   │ │ Encoding  │
-└─────────┘  └───────────┘
-            │
-            ▼ (offline)
-┌─────────────────────────┐
-│   SLEEP CONSOLIDATION   │
-│  Pattern Extraction     │
-│  Memory Compression     │
-└─────────────────────────┘
+
+## Language & Semantic Loop
+
+```mermaid
+sequenceDiagram
+    participant Thalamus
+    participant LanguageCortex
+    participant TemporalCortex
+    participant Prefrontal
+    participant Workspace
+    participant DMN
+
+    Thalamus->>LanguageCortex: Textual signal
+    LanguageCortex->>Prefrontal: Semantic representation
+    LanguageCortex->>TemporalCortex: Salient terms + intent
+    TemporalCortex->>Prefrontal: Semantic insight
+    TemporalCortex->>Workspace: High-confidence insight
+    TemporalCortex->>DMN: Narrative reinforcement
 ```
 
 ## Module Interfaces

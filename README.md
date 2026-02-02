@@ -2,7 +2,7 @@
 
 **An elegant, modular simulation of consciousness — built by AI agents collaborating.**
 
-[![Tests](https://img.shields.io/badge/tests-208%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-349%20passing-brightgreen)]()
 [![Rust](https://img.shields.io/badge/rust-1.93+-orange)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
@@ -103,19 +103,8 @@ fn main() -> digital_brain::Result<()> {
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     CONSCIOUSNESS LAYER                         │
-│            (Global Workspace / Attention Routing)               │
-├─────────────┬─────────────┬─────────────┬─────────────┬────────┤
-│  PREFRONTAL │  HIPPOCAMPUS│   AMYGDALA  │  THALAMUS   │  DMN   │
-│   Working   │   Memory    │  Emotional  │  Attention  │  Self  │
-│   Memory    │ Consolidate │   Valence   │   Router    │ Model  │
-├─────────────┴─────────────┴─────────────┴─────────────┴────────┤
-│                    PREDICTION ENGINE                            │
-│              (Surprise / Dopamine / Learning)                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+See `docs/ARCHITECTURE.md` and `docs/REGION_MAP.md` for mermaid diagrams and
+full signal flow documentation.
 
 ## Modules
 
@@ -126,6 +115,8 @@ fn main() -> digital_brain::Result<()> {
 | `Prefrontal` | Prefrontal Cortex | Working memory | 7±2 capacity, chunking, goals |
 | `Thalamus` | Thalamus | Sensory gateway | Gating, habituation, attention routing |
 | `DMN` | Default Mode Network | Self-model | Identity, beliefs, reflection, theory of mind |
+| `LanguageCortex` | Language cortex | Linguistic grounding | Intent + sentiment + semantic features |
+| `TemporalCortex` | Temporal cortex | Semantic association | Concept graph + insights |
 | `PredictionEngine` | Dopamine system | Learning | Surprise detection, learning rate modulation |
 | `GlobalWorkspace` | Consciousness | Integration | Salience competition, broadcast mechanism |
 

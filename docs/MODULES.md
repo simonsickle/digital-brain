@@ -80,6 +80,34 @@ Features:
 
 ---
 
+### Language Cortex (Linguistic Grounding)
+**Status:** ✅ Complete
+**Location:** `src/regions/language_cortex.rs`
+
+Grounds linguistic input and inner speech into semantic representations.
+
+Features:
+- Intent detection (question/command/statement)
+- Sentiment and salience estimation
+- Inner speech grounding
+- Semantic feature extraction (salient terms + key phrases)
+
+---
+
+### Temporal Cortex (Semantic Association)
+**Status:** ✅ Complete
+**Location:** `src/regions/temporal_cortex.rs`
+
+Lightweight semantic association network for meaning integration.
+
+Features:
+- Concept activation and decay
+- Association graph between salient terms
+- Semantic insight generation
+- Integration with language cortex and DMN
+
+---
+
 ## Core Systems (All Implemented ✅)
 
 ### Prediction Engine
@@ -170,6 +198,5 @@ Full autonomous agent with brain + action systems.
 
 ## Statistics
 
-- **Tests:** 209 passing
-- **Lines of code:** ~13,000
-- **Modules:** 15 core components
+- **Tests:** 349 passing
+- **Modules:** 18+ core components

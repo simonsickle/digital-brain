@@ -41,6 +41,7 @@ use crate::regions::sensory_cortex::{
     VisualCortex,
 };
 use crate::regions::stn::{STN, StopReason, StopSignal, TaskConfig, TaskId};
+use crate::regions::temporal_cortex::{SemanticInsight, TemporalCortex};
 use crate::regions::thalamus::{Destination, Thalamus};
 use crate::signal::{BrainSignal, MemoryTrace, Salience, SignalType};
 
@@ -160,6 +161,8 @@ pub struct Brain {
     pub language_cortex: LanguageCortex,
     /// Inner speech generator
     pub inner_speech: InnerSpeechSystem,
+    /// Temporal cortex semantic association
+    pub temporal_cortex: TemporalCortex,
     /// Neuromodulatory system (dopamine, serotonin, norepinephrine, acetylcholine)
     pub neuromodulators: NeuromodulatorySystem,
     /// Nervous system (inter-module signal routing)
@@ -235,6 +238,7 @@ impl Brain {
             insula: Insula::new(),
             language_cortex: LanguageCortex::new(),
             inner_speech: InnerSpeechSystem::new(),
+            temporal_cortex: TemporalCortex::new(),
             neuromodulators: NeuromodulatorySystem::new(),
             nervous_system: NervousSystem::new(),
             schemas: SchemaStore::new(),
@@ -1349,6 +1353,10 @@ impl Brain {
             self.dmn
                 .narrate(&representation.content, representation.sentiment.abs());
         }
+
+        if let Some(insight) = self.temporal_cortex.ingest_language(representation) {
+            self.route_semantic_insight(&insight);
+        }
     }
 
     fn route_inner_speech(&mut self, utterance: InnerUtterance) {
@@ -1388,6 +1396,32 @@ impl Brain {
             );
             self.workspace.submit(language_signal);
         }
+
+        if let Some(insight) = self.temporal_cortex.ingest_language(&representation) {
+            self.route_semantic_insight(&insight);
+        }
+    }
+
+    fn route_semantic_insight(&mut self, insight: &SemanticInsight) {
+        let signal = insight.to_signal();
+        self.nervous_system.transmit(
+            BrainRegion::TemporalCortex,
+            BrainRegion::Prefrontal,
+            signal.clone(),
+        );
+        self.prefrontal.load(&signal);
+
+        if insight.confidence > 0.65 {
+            self.nervous_system.transmit(
+                BrainRegion::TemporalCortex,
+                BrainRegion::Workspace,
+                signal.clone(),
+            );
+            self.workspace.submit(signal.clone());
+        }
+
+        self.nervous_system
+            .transmit(BrainRegion::TemporalCortex, BrainRegion::DMN, signal);
     }
 
     fn generate_dream_insights(&self, memories: &[MemoryTrace]) -> Vec<String> {

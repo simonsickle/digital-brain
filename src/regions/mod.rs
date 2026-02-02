@@ -19,6 +19,7 @@
 //! - **motor_cortex**: Action planning and sequencing
 //! - **brainstem**: Autonomic control and bodily feedback
 //! - **language_cortex**: Linguistic comprehension and inner speech grounding
+//! - **temporal_cortex**: Semantic association and meaning integration
 
 pub mod acc;
 pub mod amygdala;
@@ -36,6 +37,7 @@ pub mod prefrontal;
 pub mod schema;
 pub mod sensory_cortex;
 pub mod stn;
+pub mod temporal_cortex;
 pub mod thalamus;
 
 // Re-export key types
@@ -64,3 +66,6 @@ pub use sensory_cortex::{
     SomatosensoryCortex, VisualCortex,
 };
 pub use stn::{MonitoredTask, STN, StopReason, StopSignal, TaskConfig, TaskId, TaskState};
+pub use temporal_cortex::{
+    SemanticInsight, TemporalCortex, TemporalCortexConfig, TemporalCortexStats,
+};
