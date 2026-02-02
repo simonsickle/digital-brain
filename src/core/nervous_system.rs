@@ -49,6 +49,7 @@ pub enum BrainRegion {
     SomatosensoryCortex,
     GustatoryCortex,
     OlfactoryCortex,
+    LanguageCortex,
     PosteriorParietal,
     MotorCortex,
     Brainstem,
@@ -76,6 +77,7 @@ impl BrainRegion {
             BrainRegion::SomatosensoryCortex => "SomatosensoryCortex",
             BrainRegion::GustatoryCortex => "GustatoryCortex",
             BrainRegion::OlfactoryCortex => "OlfactoryCortex",
+            BrainRegion::LanguageCortex => "LanguageCortex",
             BrainRegion::PosteriorParietal => "PosteriorParietal",
             BrainRegion::MotorCortex => "MotorCortex",
             BrainRegion::Brainstem => "Brainstem",
@@ -274,6 +276,11 @@ impl NervousSystem {
             BrainRegion::OlfactoryCortex,
             0.7,
         ));
+        self.add_pathway(Pathway::new(
+            BrainRegion::Thalamus,
+            BrainRegion::LanguageCortex,
+            0.85,
+        ));
 
         // Thalamus → Posterior Parietal (multimodal integration gateway)
         self.add_pathway(Pathway::new(
@@ -348,6 +355,7 @@ impl NervousSystem {
             BrainRegion::SomatosensoryCortex,
             BrainRegion::GustatoryCortex,
             BrainRegion::OlfactoryCortex,
+            BrainRegion::LanguageCortex,
         ] {
             self.add_pathway(
                 Pathway::new(region, BrainRegion::Prefrontal, 0.8)
@@ -414,6 +422,7 @@ impl NervousSystem {
             BrainRegion::MotorCortex,
             BrainRegion::Hypothalamus,
             BrainRegion::Insula,
+            BrainRegion::LanguageCortex,
         ] {
             self.add_pathway(
                 Pathway::new(BrainRegion::Workspace, region, 1.0)
@@ -467,6 +476,7 @@ impl NervousSystem {
             BrainRegion::SomatosensoryCortex,
             BrainRegion::GustatoryCortex,
             BrainRegion::OlfactoryCortex,
+            BrainRegion::LanguageCortex,
             BrainRegion::PosteriorParietal,
             BrainRegion::MotorCortex,
             BrainRegion::Brainstem,

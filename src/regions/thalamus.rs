@@ -81,6 +81,8 @@ pub enum Destination {
     GustatoryCortex,
     /// Send to olfactory cortex for feature extraction
     OlfactoryCortex,
+    /// Send to language cortex for linguistic processing
+    LanguageCortex,
     /// Send to posterior parietal cortex for multimodal binding
     PosteriorParietal,
     /// Send to prefrontal for working memory
@@ -390,29 +392,48 @@ impl Thalamus {
             .unwrap_or_else(|| signal.content.to_string().to_ascii_lowercase());
 
         let mut destinations = Vec::new();
+        let mut has_non_language = false;
+
+        if self.is_language_signal(signal) {
+            destinations.push(Destination::LanguageCortex);
+        }
 
         if let Some(modality) = modality_from_metadata(signal) {
             match modality.as_str() {
-                "visual" => destinations.push(Destination::VisualCortex),
-                "auditory" => destinations.push(Destination::AuditoryCortex),
-                "somatosensory" | "tactile" | "touch" => {
-                    destinations.push(Destination::SomatosensoryCortex)
+                "visual" => {
+                    destinations.push(Destination::VisualCortex);
+                    has_non_language = true;
                 }
-                "gustatory" | "taste" => destinations.push(Destination::GustatoryCortex),
-                "olfactory" | "smell" => destinations.push(Destination::OlfactoryCortex),
+                "auditory" => {
+                    destinations.push(Destination::AuditoryCortex);
+                    has_non_language = true;
+                }
+                "somatosensory" | "tactile" | "touch" => {
+                    destinations.push(Destination::SomatosensoryCortex);
+                    has_non_language = true;
+                }
+                "gustatory" | "taste" => {
+                    destinations.push(Destination::GustatoryCortex);
+                    has_non_language = true;
+                }
+                "olfactory" | "smell" => {
+                    destinations.push(Destination::OlfactoryCortex);
+                    has_non_language = true;
+                }
                 "multi" | "multimodal" => {
                     destinations.extend([
                         Destination::VisualCortex,
                         Destination::AuditoryCortex,
                         Destination::SomatosensoryCortex,
                     ]);
+                    has_non_language = true;
                 }
                 _ => {}
             }
         }
 
         // Keyword-based fallback if metadata absent or ambiguous
-        if destinations.is_empty() {
+        if !has_non_language {
             if contains_any(
                 &content,
                 &[
@@ -421,6 +442,7 @@ impl Thalamus {
                 ],
             ) {
                 destinations.push(Destination::VisualCortex);
+                has_non_language = true;
             }
             if contains_any(
                 &content,
@@ -430,6 +452,7 @@ impl Thalamus {
                 ],
             ) {
                 destinations.push(Destination::AuditoryCortex);
+                has_non_language = true;
             }
             if contains_any(
                 &content,
@@ -447,6 +470,7 @@ impl Thalamus {
                 ],
             ) {
                 destinations.push(Destination::SomatosensoryCortex);
+                has_non_language = true;
             }
             if contains_any(
                 &content,
@@ -463,6 +487,7 @@ impl Thalamus {
                 ],
             ) {
                 destinations.push(Destination::GustatoryCortex);
+                has_non_language = true;
             }
             if contains_any(
                 &content,
@@ -479,15 +504,23 @@ impl Thalamus {
                 ],
             ) {
                 destinations.push(Destination::OlfactoryCortex);
+                has_non_language = true;
             }
         }
 
-        if destinations.is_empty() {
+        if !has_non_language {
             // Default to visual and auditory for generic sensory content
             destinations.extend([Destination::VisualCortex, Destination::AuditoryCortex]);
         }
 
         destinations
+    }
+
+    fn is_language_signal(&self, signal: &BrainSignal) -> bool {
+        signal
+            .content
+            .as_str()
+            .is_some_and(|text| text.chars().any(|c| c.is_alphabetic()))
     }
 }
 

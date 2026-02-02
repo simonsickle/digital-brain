@@ -7,6 +7,7 @@ use crate::core::attention::{
     AttentionBudget, AttentionStats, TaskComplexity, estimate_complexity,
 };
 use crate::core::emotion::{ActionTendency, Appraisal, EmotionSystem, RegulationStrategy};
+use crate::core::inner_speech::{InnerSpeechSystem, InnerUtterance};
 use crate::core::nervous_system::{BrainRegion, NervousSystem, NervousSystemStats};
 use crate::core::neuromodulators::{
     NeuromodulatorState, NeuromodulatorySystem, RewardCategory, RewardQuality,
@@ -20,7 +21,7 @@ use crate::core::social::{SocialCognition, TheoryOfMindState};
 use crate::core::workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
 use crate::error::{BrainError, Result};
 use crate::regions::acc::{ACC, ControlSignal};
-use crate::regions::amygdala::{Amygdala, EmotionalAppraisal};
+use crate::regions::amygdala::{Amygdala, Emotion, EmotionalAppraisal};
 use crate::regions::basal_ganglia::{ActionPattern, BasalGanglia, GateDecision};
 use crate::regions::brainstem::{AutonomicFeedback, Brainstem};
 use crate::regions::cerebellum::{Cerebellum, Procedure};
@@ -30,6 +31,7 @@ use crate::regions::dmn::{
 use crate::regions::hippocampus::HippocampusStore;
 use crate::regions::hypothalamus::{DriveType, Hypothalamus};
 use crate::regions::insula::Insula;
+use crate::regions::language_cortex::{LanguageCortex, LanguageIntent, LanguageRepresentation};
 use crate::regions::motor_cortex::{MotorCommand, MotorCortex};
 use crate::regions::posterior_parietal::{MultimodalContext, PosteriorParietalCortex};
 use crate::regions::prefrontal::{PrefrontalConfig, PrefrontalCortex};
@@ -154,6 +156,10 @@ pub struct Brain {
     pub hypothalamus: Hypothalamus,
     /// Interoceptive awareness
     pub insula: Insula,
+    /// Language comprehension and inner speech grounding
+    pub language_cortex: LanguageCortex,
+    /// Inner speech generator
+    pub inner_speech: InnerSpeechSystem,
     /// Neuromodulatory system (dopamine, serotonin, norepinephrine, acetylcholine)
     pub neuromodulators: NeuromodulatorySystem,
     /// Nervous system (inter-module signal routing)
@@ -227,6 +233,8 @@ impl Brain {
             brainstem: Brainstem::new(),
             hypothalamus: Hypothalamus::new(),
             insula: Insula::new(),
+            language_cortex: LanguageCortex::new(),
+            inner_speech: InnerSpeechSystem::new(),
             neuromodulators: NeuromodulatorySystem::new(),
             nervous_system: NervousSystem::new(),
             schemas: SchemaStore::new(),
@@ -479,6 +487,27 @@ impl Brain {
         // Update serotonin mood tracking
         self.neuromodulators.serotonin.record_mood(mood_valence);
 
+        if emotion.is_significant
+            && let Some(primary) = emotion.primary_emotion
+        {
+            let label = match primary {
+                Emotion::Joy => "joy",
+                Emotion::Sadness => "sadness",
+                Emotion::Fear => "fear",
+                Emotion::Anger => "anger",
+                Emotion::Surprise => "surprise",
+                Emotion::Disgust => "disgust",
+                Emotion::Trust => "trust",
+                Emotion::Anticipation => "anticipation",
+            };
+            let utterance = self
+                .inner_speech
+                .process_emotion(label, emotion.arousal.value());
+            self.route_inner_speech(utterance);
+        }
+
+        let mut language_representation: Option<LanguageRepresentation> = None;
+
         // 5. Route to appropriate modules
         for dest in &routed.destinations {
             match dest {
@@ -489,6 +518,22 @@ impl Brain {
                 | Destination::OlfactoryCortex
                 | Destination::PosteriorParietal => {
                     // Already handled in sensory cascade; nothing else to do here.
+                }
+                Destination::LanguageCortex => {
+                    if language_representation.is_none() {
+                        self.nervous_system.transmit(
+                            BrainRegion::Thalamus,
+                            BrainRegion::LanguageCortex,
+                            tagged_signal.clone(),
+                        );
+                        if let Some(rep) = self.language_cortex.process_signal(&tagged_signal) {
+                            if let Ok(value) = serde_json::to_value(&rep) {
+                                tagged_signal.metadata.insert("language".to_string(), value);
+                            }
+                            self.route_language_representation(&rep);
+                            language_representation = Some(rep);
+                        }
+                    }
                 }
                 Destination::Workspace => {
                     let workspace_signal = if let Some(context) = &multimodal_context {
@@ -602,6 +647,9 @@ impl Brain {
                     .dmn
                     .reflect(ReflectionTrigger::Emotional, Some(&content));
                 reflections.push(reflection.content);
+                let reflection_text = reflections.last().map(String::as_str).unwrap_or(&content);
+                let utterance = self.inner_speech.comment(reflection_text);
+                self.route_inner_speech(utterance);
 
                 // Signal deep processing for acetylcholine
                 self.neuromodulators
@@ -616,11 +664,23 @@ impl Brain {
         // 8. DMN cycle (may generate scheduled reflection)
         if let Some(reflection) = self.dmn.process_cycle() {
             reflections.push(reflection.content);
+            let reflection_text = reflections.last().map(String::as_str).unwrap_or(&content);
+            let utterance = self.inner_speech.comment(reflection_text);
+            self.route_inner_speech(utterance);
         }
 
         // 9. Narrate significant experiences
         if emotion.is_significant {
             self.dmn.narrate(&content, emotion.arousal.value());
+            self.inner_speech.narrate(&content);
+            let latest_utterance = self
+                .inner_speech
+                .recent(1)
+                .first()
+                .map(|utterance| (*utterance).clone());
+            if let Some(utterance) = latest_utterance {
+                self.route_inner_speech(utterance);
+            }
         }
 
         // 10. Neuromodulatory system homeostatic update
@@ -1264,6 +1324,72 @@ impl Brain {
         }
     }
 
+    fn route_language_representation(&mut self, representation: &LanguageRepresentation) {
+        let language_signal = representation.to_signal();
+
+        self.nervous_system.transmit(
+            BrainRegion::LanguageCortex,
+            BrainRegion::Prefrontal,
+            language_signal.clone(),
+        );
+        self.prefrontal.load(&language_signal);
+
+        if representation.should_broadcast() {
+            self.nervous_system.transmit(
+                BrainRegion::LanguageCortex,
+                BrainRegion::Workspace,
+                language_signal.clone(),
+            );
+            self.workspace.submit(language_signal.clone());
+        }
+
+        if representation.intent == LanguageIntent::Reflection
+            && representation.sentiment.abs() > 0.2
+        {
+            self.dmn
+                .narrate(&representation.content, representation.sentiment.abs());
+        }
+    }
+
+    fn route_inner_speech(&mut self, utterance: InnerUtterance) {
+        let representation = self.language_cortex.process_inner_speech(&utterance);
+        let mut language_signal = representation.to_signal();
+        language_signal.metadata.insert(
+            "inner_speech_voluntary".to_string(),
+            serde_json::Value::Bool(utterance.voluntary),
+        );
+        language_signal.metadata.insert(
+            "inner_speech_intensity".to_string(),
+            serde_json::Value::from(utterance.intensity),
+        );
+        language_signal.metadata.insert(
+            "inner_speech_emotional_tone".to_string(),
+            serde_json::Value::from(utterance.emotional_tone),
+        );
+        if let Some(context) = utterance.context {
+            language_signal.metadata.insert(
+                "inner_speech_context".to_string(),
+                serde_json::Value::String(context),
+            );
+        }
+
+        self.nervous_system.transmit(
+            BrainRegion::LanguageCortex,
+            BrainRegion::Prefrontal,
+            language_signal.clone(),
+        );
+        self.prefrontal.load(&language_signal);
+
+        if representation.should_broadcast() {
+            self.nervous_system.transmit(
+                BrainRegion::LanguageCortex,
+                BrainRegion::Workspace,
+                language_signal.clone(),
+            );
+            self.workspace.submit(language_signal);
+        }
+    }
+
     fn generate_dream_insights(&self, memories: &[MemoryTrace]) -> Vec<String> {
         let mut candidates: Vec<_> = memories.iter().collect();
         candidates.sort_by(|a, b| {
@@ -1467,9 +1593,10 @@ impl Brain {
 
     /// Ask the brain to reflect on something.
     pub fn reflect(&mut self, topic: &str) -> String {
-        self.dmn
-            .reflect(ReflectionTrigger::Query, Some(topic))
-            .content
+        let reflection = self.dmn.reflect(ReflectionTrigger::Query, Some(topic));
+        let utterance = self.inner_speech.comment(&reflection.content);
+        self.route_inner_speech(utterance);
+        reflection.content
     }
 
     /// Get the brain's self-description.
@@ -2529,6 +2656,33 @@ mod tests {
         let _result = brain.process("Hello, world!").unwrap();
 
         assert!(brain.cycle_count > 0);
+    }
+
+    #[test]
+    fn test_language_cortex_enriches_signal() {
+        let mut brain = Brain::new().unwrap();
+
+        let result = brain.process("Why does this happen?").unwrap();
+
+        let language = result
+            .tagged_signal
+            .metadata
+            .get("language")
+            .expect("language metadata");
+        let intent = language
+            .get("intent")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default();
+        assert_eq!(intent, "question");
+    }
+
+    #[test]
+    fn test_inner_speech_routes_language_cortex() {
+        let mut brain = Brain::new().unwrap();
+
+        let _ = brain.reflect("planning");
+
+        assert!(brain.language_cortex.stats().total_inner_utterances > 0);
     }
 
     #[test]

@@ -18,6 +18,7 @@
 //! - **posterior_parietal**: Multimodal binding and context integration
 //! - **motor_cortex**: Action planning and sequencing
 //! - **brainstem**: Autonomic control and bodily feedback
+//! - **language_cortex**: Linguistic comprehension and inner speech grounding
 
 pub mod acc;
 pub mod amygdala;
@@ -28,6 +29,7 @@ pub mod dmn;
 pub mod hippocampus;
 pub mod hypothalamus;
 pub mod insula;
+pub mod language_cortex;
 pub mod motor_cortex;
 pub mod posterior_parietal;
 pub mod prefrontal;
@@ -50,6 +52,10 @@ pub use hypothalamus::{
 pub use insula::{
     BodyState, DisgustResponse, DisgustType, EmpathicResponse, Insula, InsulaConfig, InsulaStats,
     RiskAnticipation, SubjectiveFeeling,
+};
+pub use language_cortex::{
+    LanguageCortex, LanguageCortexConfig, LanguageIntent, LanguageOrigin, LanguageRepresentation,
+    LanguageStats,
 };
 pub use motor_cortex::{MotorCommand, MotorCortex, MotorStep};
 pub use posterior_parietal::{MultimodalContext, PosteriorParietalCortex};
