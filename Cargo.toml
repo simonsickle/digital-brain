@@ -73,6 +73,10 @@ path = "examples/semantic_search_demo.rs"
 name = "brain_repl"
 path = "examples/brain_repl.rs"
 
+[[example]]
+name = "onboard_agent"
+path = "examples/onboard_agent.rs"
+
 [[bench]]
 name = "agent_bench"
 harness = false

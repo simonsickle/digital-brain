@@ -34,6 +34,7 @@ pub mod agent;
 pub mod brain;
 pub mod core;
 pub mod error;
+pub mod onboarding;
 pub mod regions;
 pub mod signal;
 
@@ -49,6 +50,10 @@ pub use core::{
     TrustLevel,
 };
 pub use error::{BrainError, Result};
+pub use onboarding::{
+    AgentPersonality, AgentSetup, CoreDirective, InitialKnowledge, ModelProviderConfig,
+    OnboardingConfig, OnboardingWizard, TerminalStyle, TerminalUI,
+};
 pub use signal::{Arousal, BrainSignal, MemoryTrace, Salience, SignalType, Valence};
 
 /// Prelude for convenient imports

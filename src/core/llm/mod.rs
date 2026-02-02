@@ -31,7 +31,7 @@ pub use traits::{
 };
 
 /// Available LLM providers
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum LlmProvider {
     Anthropic,
     OpenAI,
