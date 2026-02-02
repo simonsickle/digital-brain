@@ -529,6 +529,27 @@ impl Insula {
         self.add_feeling(feeling);
     }
 
+    /// Integrate autonomic feedback from brainstem (bodily state updates).
+    pub fn integrate_autonomic_feedback(&mut self, body_state: BodyState) {
+        let blended = self
+            .body_state
+            .blend(&body_state, self.config.homeostatic_rate);
+        self.body_state = blended.clone();
+        self.body_history.push_back(blended);
+
+        if self.body_history.len() > self.max_history {
+            self.body_history.pop_front();
+        }
+
+        if self.body_state.is_alert() {
+            let feeling = SubjectiveFeeling::new("physiological_alert", 0.6, -0.2);
+            self.add_feeling(feeling);
+        } else if self.body_state.is_calm() {
+            let feeling = SubjectiveFeeling::new("physiological_calm", 0.4, 0.2);
+            self.add_feeling(feeling);
+        }
+    }
+
     /// Empathize with another agent's state
     pub fn empathize(
         &mut self,

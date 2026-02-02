@@ -16,11 +16,14 @@ use crate::error::{BrainError, Result};
 use crate::regions::acc::{ACC, ControlSignal};
 use crate::regions::amygdala::{Amygdala, EmotionalAppraisal};
 use crate::regions::basal_ganglia::{ActionPattern, BasalGanglia, GateDecision};
+use crate::regions::brainstem::{AutonomicFeedback, Brainstem};
 use crate::regions::cerebellum::{Cerebellum, Procedure};
 use crate::regions::dmn::{
     Belief, BeliefCategory, DefaultModeNetwork, Identity, ReflectionTrigger,
 };
 use crate::regions::hippocampus::HippocampusStore;
+use crate::regions::hypothalamus::{DriveType, Hypothalamus};
+use crate::regions::insula::Insula;
 use crate::regions::motor_cortex::{MotorCommand, MotorCortex};
 use crate::regions::posterior_parietal::{MultimodalContext, PosteriorParietalCortex};
 use crate::regions::prefrontal::{PrefrontalConfig, PrefrontalCortex};
@@ -110,6 +113,12 @@ pub struct Brain {
     pub posterior_parietal: PosteriorParietalCortex,
     /// Motor planning and sequencing
     pub motor_cortex: MotorCortex,
+    /// Autonomic control and feedback
+    pub brainstem: Brainstem,
+    /// Homeostatic drives
+    pub hypothalamus: Hypothalamus,
+    /// Interoceptive awareness
+    pub insula: Insula,
     /// Neuromodulatory system (dopamine, serotonin, norepinephrine, acetylcholine)
     pub neuromodulators: NeuromodulatorySystem,
     /// Nervous system (inter-module signal routing)
@@ -171,6 +180,9 @@ impl Brain {
             olfactory_cortex: OlfactoryCortex::new(),
             posterior_parietal: PosteriorParietalCortex::new(),
             motor_cortex: MotorCortex::new(),
+            brainstem: Brainstem::new(),
+            hypothalamus: Hypothalamus::new(),
+            insula: Insula::new(),
             neuromodulators: NeuromodulatorySystem::new(),
             nervous_system: NervousSystem::new(),
             schemas: SchemaStore::new(),
@@ -212,6 +224,7 @@ impl Brain {
         if routed_signals.is_empty() {
             // Signal was filtered - update neuromodulators anyway
             self.neuromodulators.update();
+            self.update_autonomic_cycle();
             self.cycle_count += 1;
 
             return Ok(ProcessingResult {
@@ -446,6 +459,7 @@ impl Brain {
 
         // 10. Neuromodulatory system homeostatic update
         self.neuromodulators.update();
+        self.update_autonomic_cycle();
 
         self.cycle_count += 1;
 
@@ -626,6 +640,47 @@ impl Brain {
         }
 
         outputs
+    }
+
+    fn update_autonomic_cycle(&mut self) {
+        self.hypothalamus.update();
+        let feedback = self
+            .brainstem
+            .update(&self.hypothalamus, &self.neuromodulators.state());
+
+        self.apply_autonomic_feedback(&feedback);
+
+        if let Ok(value) = serde_json::to_value(&feedback) {
+            let signal = BrainSignal::new("brainstem", SignalType::Sensory, feedback)
+                .with_salience(0.4)
+                .with_metadata("autonomic", value);
+            self.nervous_system.transmit(
+                BrainRegion::Brainstem,
+                BrainRegion::Insula,
+                signal.clone(),
+            );
+            self.nervous_system
+                .transmit(BrainRegion::Brainstem, BrainRegion::Hypothalamus, signal);
+        }
+    }
+
+    fn apply_autonomic_feedback(&mut self, feedback: &AutonomicFeedback) {
+        self.insula
+            .integrate_autonomic_feedback(feedback.body_state.clone());
+
+        if feedback.body_state.energy < 0.4 {
+            self.hypothalamus.satisfy_drive(DriveType::Fatigue, -0.05);
+        }
+        if feedback.body_state.gut < -0.2 {
+            self.hypothalamus.satisfy_drive(DriveType::Hunger, -0.03);
+            self.hypothalamus.satisfy_drive(DriveType::Thirst, -0.02);
+        }
+        if feedback.stress_signal > 0.6 {
+            self.hypothalamus
+                .trigger_stress((feedback.stress_signal - 0.5) * 0.5);
+            self.insula
+                .process_threat("autonomic stress", feedback.stress_signal);
+        }
     }
 
     fn update_sensory_schemas(
@@ -1848,6 +1903,18 @@ mod tests {
 
         assert_eq!(command.action_id, action_id);
         assert_eq!(command.steps.len(), 2);
+    }
+
+    #[test]
+    fn test_autonomic_feedback_updates_insula() {
+        let mut brain = Brain::new().unwrap();
+        let initial = brain.insula.body_state.heart_rate;
+
+        brain.hypothalamus.trigger_stress(0.8);
+        brain.update_autonomic_cycle();
+
+        let updated = brain.insula.body_state.heart_rate;
+        assert!(updated >= initial);
     }
 
     #[test]

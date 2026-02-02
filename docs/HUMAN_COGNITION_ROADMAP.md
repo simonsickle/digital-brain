@@ -57,7 +57,7 @@ Create a cognitive architecture indistinguishable from human cognition.
 ### Phase B: Motor & Autonomic Control
 4. ✅ Implement motor cortex layers that translate basal ganglia output into structured actions.
 5. ✅ Extend cerebellar forward models and motor imagery, closing loops with the imagination engine.
-6. Simulate brainstem autonomic centres to give hypothalamus/insula real-time feedback.
+6. ✅ Simulate brainstem autonomic centres to give hypothalamus/insula real-time feedback.
 
 ### Phase C: Salience & Social Reasoning
 7. Formalize dorsal/ventral attention and the salience network (anterior insula + dorsal ACC).

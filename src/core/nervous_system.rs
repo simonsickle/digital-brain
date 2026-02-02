@@ -51,6 +51,9 @@ pub enum BrainRegion {
     OlfactoryCortex,
     PosteriorParietal,
     MotorCortex,
+    Brainstem,
+    Hypothalamus,
+    Insula,
     Prefrontal,
     DMN,
     Workspace,
@@ -75,6 +78,9 @@ impl BrainRegion {
             BrainRegion::OlfactoryCortex => "OlfactoryCortex",
             BrainRegion::PosteriorParietal => "PosteriorParietal",
             BrainRegion::MotorCortex => "MotorCortex",
+            BrainRegion::Brainstem => "Brainstem",
+            BrainRegion::Hypothalamus => "Hypothalamus",
+            BrainRegion::Insula => "Insula",
             BrainRegion::Prefrontal => "Prefrontal",
             BrainRegion::DMN => "DMN",
             BrainRegion::Workspace => "Workspace",
@@ -283,6 +289,16 @@ impl NervousSystem {
             0.8,
         ));
 
+        // Brainstem → Hypothalamus/Insula (autonomic feedback)
+        self.add_pathway(
+            Pathway::new(BrainRegion::Brainstem, BrainRegion::Hypothalamus, 0.9)
+                .with_signal_types(vec![SignalType::Sensory, SignalType::Attention]),
+        );
+        self.add_pathway(
+            Pathway::new(BrainRegion::Brainstem, BrainRegion::Insula, 0.9)
+                .with_signal_types(vec![SignalType::Sensory, SignalType::Attention]),
+        );
+
         // Basal Ganglia → Motor Cortex (action selection to motor planning)
         self.add_pathway(
             Pathway::new(BrainRegion::BasalGanglia, BrainRegion::MotorCortex, 0.9)
@@ -396,6 +412,8 @@ impl NervousSystem {
             BrainRegion::PredictionEngine,
             BrainRegion::PosteriorParietal,
             BrainRegion::MotorCortex,
+            BrainRegion::Hypothalamus,
+            BrainRegion::Insula,
         ] {
             self.add_pathway(
                 Pathway::new(BrainRegion::Workspace, region, 1.0)
@@ -439,6 +457,9 @@ impl NervousSystem {
             BrainRegion::OlfactoryCortex,
             BrainRegion::PosteriorParietal,
             BrainRegion::MotorCortex,
+            BrainRegion::Brainstem,
+            BrainRegion::Hypothalamus,
+            BrainRegion::Insula,
             BrainRegion::Prefrontal,
             BrainRegion::DMN,
             BrainRegion::Workspace,

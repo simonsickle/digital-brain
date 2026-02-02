@@ -17,10 +17,12 @@
 //! - **sensory_cortex**: Modality-specific feature extraction downstream of thalamus
 //! - **posterior_parietal**: Multimodal binding and context integration
 //! - **motor_cortex**: Action planning and sequencing
+//! - **brainstem**: Autonomic control and bodily feedback
 
 pub mod acc;
 pub mod amygdala;
 pub mod basal_ganglia;
+pub mod brainstem;
 pub mod cerebellum;
 pub mod dmn;
 pub mod hippocampus;
@@ -37,6 +39,7 @@ pub mod thalamus;
 // Re-export key types
 pub use acc::{ACC, Conflict, ControlSignal, Error, ErrorType};
 pub use basal_ganglia::{ActionPattern, BasalGanglia, GateDecision, SelectionResult};
+pub use brainstem::{AutonomicFeedback, Brainstem, BrainstemConfig};
 pub use cerebellum::{
     Cerebellum, ForwardModel, MotorImagery, Procedure, ProcedureStep, TimingPrediction,
 };
