@@ -44,6 +44,11 @@ pub enum BrainRegion {
     Thalamus,
     Amygdala,
     Hippocampus,
+    VisualCortex,
+    AuditoryCortex,
+    SomatosensoryCortex,
+    GustatoryCortex,
+    OlfactoryCortex,
     Prefrontal,
     DMN,
     Workspace,
@@ -61,6 +66,11 @@ impl BrainRegion {
             BrainRegion::Thalamus => "Thalamus",
             BrainRegion::Amygdala => "Amygdala",
             BrainRegion::Hippocampus => "Hippocampus",
+            BrainRegion::VisualCortex => "VisualCortex",
+            BrainRegion::AuditoryCortex => "AuditoryCortex",
+            BrainRegion::SomatosensoryCortex => "SomatosensoryCortex",
+            BrainRegion::GustatoryCortex => "GustatoryCortex",
+            BrainRegion::OlfactoryCortex => "OlfactoryCortex",
             BrainRegion::Prefrontal => "Prefrontal",
             BrainRegion::DMN => "DMN",
             BrainRegion::Workspace => "Workspace",
@@ -228,6 +238,33 @@ impl NervousSystem {
             0.9,
         ));
 
+        // Thalamus → Sensory cortices
+        self.add_pathway(Pathway::new(
+            BrainRegion::Thalamus,
+            BrainRegion::VisualCortex,
+            0.9,
+        ));
+        self.add_pathway(Pathway::new(
+            BrainRegion::Thalamus,
+            BrainRegion::AuditoryCortex,
+            0.9,
+        ));
+        self.add_pathway(Pathway::new(
+            BrainRegion::Thalamus,
+            BrainRegion::SomatosensoryCortex,
+            0.85,
+        ));
+        self.add_pathway(Pathway::new(
+            BrainRegion::Thalamus,
+            BrainRegion::GustatoryCortex,
+            0.7,
+        ));
+        self.add_pathway(Pathway::new(
+            BrainRegion::Thalamus,
+            BrainRegion::OlfactoryCortex,
+            0.7,
+        ));
+
         // Thalamus → Prefrontal (sensory to working memory)
         self.add_pathway(Pathway::new(
             BrainRegion::Thalamus,
@@ -258,6 +295,28 @@ impl NervousSystem {
             Pathway::new(BrainRegion::Amygdala, BrainRegion::Workspace, 0.8)
                 .with_signal_types(vec![SignalType::Emotion, SignalType::Attention]),
         );
+
+        // Sensory cortex projections to higher areas
+        for region in [
+            BrainRegion::VisualCortex,
+            BrainRegion::AuditoryCortex,
+            BrainRegion::SomatosensoryCortex,
+            BrainRegion::GustatoryCortex,
+            BrainRegion::OlfactoryCortex,
+        ] {
+            self.add_pathway(
+                Pathway::new(region, BrainRegion::Prefrontal, 0.8)
+                    .with_signal_types(vec![SignalType::Sensory, SignalType::Attention]),
+            );
+            self.add_pathway(
+                Pathway::new(region, BrainRegion::Hippocampus, 0.7)
+                    .with_signal_types(vec![SignalType::Sensory, SignalType::Memory]),
+            );
+            self.add_pathway(
+                Pathway::new(region, BrainRegion::DMN, 0.6)
+                    .with_signal_types(vec![SignalType::Sensory, SignalType::Broadcast]),
+            );
+        }
 
         // Hippocampus ↔ Prefrontal (memory and working memory integration)
         self.add_pathway(
@@ -320,6 +379,11 @@ impl NervousSystem {
             BrainRegion::Thalamus,
             BrainRegion::Amygdala,
             BrainRegion::Hippocampus,
+            BrainRegion::VisualCortex,
+            BrainRegion::AuditoryCortex,
+            BrainRegion::SomatosensoryCortex,
+            BrainRegion::GustatoryCortex,
+            BrainRegion::OlfactoryCortex,
             BrainRegion::Prefrontal,
             BrainRegion::DMN,
             BrainRegion::Workspace,

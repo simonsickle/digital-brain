@@ -144,7 +144,9 @@ impl From<&Stimulus> for ProcessedStimulus {
             StimulusKind::QueryResponse { result, .. } => {
                 ("query_response".to_string(), result.to_string())
             }
-            StimulusKind::Observation { content, .. } => ("observation".to_string(), content.clone()),
+            StimulusKind::Observation { content, .. } => {
+                ("observation".to_string(), content.clone())
+            }
         };
 
         Self {
@@ -178,12 +180,12 @@ pub struct GoalSnippet {
 /// Snapshot of emotional/neuromodulator state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmotionalSnapshot {
-    pub valence: f64,      // -1 to 1 (negative to positive)
-    pub arousal: f64,      // 0 to 1 (calm to excited)
-    pub curiosity: f64,    // 0 to 1
-    pub boredom: f64,      // 0 to 1
-    pub stress: f64,       // 0 to 1
-    pub motivation: f64,   // 0 to 1
+    pub valence: f64,    // -1 to 1 (negative to positive)
+    pub arousal: f64,    // 0 to 1 (calm to excited)
+    pub curiosity: f64,  // 0 to 1
+    pub boredom: f64,    // 0 to 1
+    pub stress: f64,     // 0 to 1
+    pub motivation: f64, // 0 to 1
     pub exploration_drive: f64,
 }
 
@@ -281,7 +283,7 @@ impl CognitionEngine {
                     context.emotional_state.stress
                 ));
             }
-            prompt.push_str("\n");
+            prompt.push('\n');
         }
 
         // Current focus
@@ -300,7 +302,7 @@ impl CognitionEngine {
                     goal.progress * 100.0
                 ));
             }
-            prompt.push_str("\n");
+            prompt.push('\n');
         }
 
         // Recent memories
@@ -309,7 +311,7 @@ impl CognitionEngine {
             for mem in &context.memories {
                 prompt.push_str(&format!("- {}\n", mem.content));
             }
-            prompt.push_str("\n");
+            prompt.push('\n');
         }
 
         // Recent actions
@@ -318,7 +320,7 @@ impl CognitionEngine {
             for action in context.recent_actions.iter().take(5) {
                 prompt.push_str(&format!("- {}\n", action));
             }
-            prompt.push_str("\n");
+            prompt.push('\n');
         }
 
         // Current stimulus
@@ -330,9 +332,11 @@ impl CognitionEngine {
             if stimulus.requires_response {
                 prompt.push_str("⚠️ This requires a response.\n");
             }
-            prompt.push_str("\n");
+            prompt.push('\n');
         } else {
-            prompt.push_str("## Current Input\nNo external input. You may think, explore, or idle.\n\n");
+            prompt.push_str(
+                "## Current Input\nNo external input. You may think, explore, or idle.\n\n",
+            );
         }
 
         prompt.push_str("## Your Action\n");
@@ -357,14 +361,14 @@ impl CognitionEngine {
         }
 
         // Also try to get multi-line content
-        if content.is_none() {
-            if let Some(start) = response.find("CONTENT:") {
-                let after_content = &response[start + 8..];
-                if let Some(end) = after_content.find("REASONING:") {
-                    content = Some(after_content[..end].trim().to_string());
-                } else {
-                    content = Some(after_content.trim().to_string());
-                }
+        if content.is_none()
+            && let Some(start) = response.find("CONTENT:")
+        {
+            let after_content = &response[start + 8..];
+            if let Some(end) = after_content.find("REASONING:") {
+                content = Some(after_content[..end].trim().to_string());
+            } else {
+                content = Some(after_content.trim().to_string());
             }
         }
 
@@ -403,28 +407,29 @@ impl CognitionEngine {
             "REQUEST_INPUT" => ConsciousAction::RequestInput {
                 prompt: parsed.content.clone(),
             },
-            "IDLE" | _ => ConsciousAction::Idle,
+            "IDLE" => ConsciousAction::Idle,
+            _ => ConsciousAction::Idle,
         }
     }
 
     /// Calculate temperature based on neuromodulator state
     pub fn calculate_temperature(&self, emotional_state: &EmotionalSnapshot) -> f64 {
         let base = self.config.base_temperature;
-        
+
         // High exploration drive → higher temperature
         let exploration_mod = emotional_state.exploration_drive * 0.2;
-        
+
         // High stress → lower temperature (more conservative)
         let stress_mod = -emotional_state.stress * 0.15;
-        
+
         // High boredom → higher temperature (try new things)
         let boredom_mod = emotional_state.boredom * 0.25;
-        
+
         (base + exploration_mod + stress_mod + boredom_mod).clamp(0.1, 1.5)
     }
 
     /// Generate a thought for mind-wandering
-    pub async fn mind_wander(&mut self, context: &CognitiveContext) -> Option<String> {
+    pub async fn mind_wander(&mut self, _context: &CognitiveContext) -> Option<String> {
         if !self.config.enable_inner_monologue {
             return None;
         }
@@ -454,10 +459,7 @@ impl CognitionEngine {
     }
 
     /// Process a stimulus through cognition
-    pub async fn process(
-        &mut self,
-        context: CognitiveContext,
-    ) -> Option<ConsciousAction> {
+    pub async fn process(&mut self, context: CognitiveContext) -> Option<ConsciousAction> {
         let prompt = self.build_prompt(&context);
         let temperature = self.calculate_temperature(&context.emotional_state);
 
@@ -488,7 +490,7 @@ impl CognitionEngine {
 
 /// A StimulusProcessor that uses the CognitionEngine
 pub struct CognitiveProcessor {
-    engine: CognitionEngine,
+    _engine: CognitionEngine,
     neuro_state: NeuromodulatorState,
     memories: Vec<MemorySnippet>,
     goals: Vec<GoalSnippet>,
@@ -498,7 +500,7 @@ pub struct CognitiveProcessor {
 impl CognitiveProcessor {
     pub fn new(engine: CognitionEngine) -> Self {
         Self {
-            engine,
+            _engine: engine,
             neuro_state: NeuromodulatorState::default(),
             memories: Vec::new(),
             goals: Vec::new(),
@@ -532,7 +534,11 @@ impl CognitiveProcessor {
         });
     }
 
-    fn build_context(&self, stimulus: Option<&Stimulus>, ctx: &ProcessingContext) -> CognitiveContext {
+    fn build_context(
+        &self,
+        stimulus: Option<&Stimulus>,
+        ctx: &ProcessingContext,
+    ) -> CognitiveContext {
         let mut emotional = EmotionalSnapshot::from(&self.neuro_state);
         emotional.boredom = self.boredom_level;
 
@@ -541,7 +547,11 @@ impl CognitiveProcessor {
             memories: self.memories.clone(),
             goals: self.goals.clone(),
             emotional_state: emotional,
-            recent_actions: ctx.recent_actions.iter().map(|a| format!("{:?}", a)).collect(),
+            recent_actions: ctx
+                .recent_actions
+                .iter()
+                .map(|a| format!("{:?}", a))
+                .collect(),
             current_focus: ctx.focus.as_ref().map(|f| f.target.clone()),
             timestamp: ctx.timestamp,
             cycle: ctx.cycle,
@@ -555,39 +565,33 @@ impl StimulusProcessor for CognitiveProcessor {
         stimulus: &Stimulus,
         context: &ProcessingContext,
     ) -> Option<ConsciousAction> {
-        let cog_context = self.build_context(Some(stimulus), context);
-        
+        let _cog_context = self.build_context(Some(stimulus), context);
+
         // Note: In real use, this would be async. For the sync trait,
         // we'd need to block or use a different approach.
         // For now, return a simple action based on stimulus type.
         match &stimulus.kind {
-            StimulusKind::ExternalPrompt { content, .. } => {
-                Some(ConsciousAction::Respond {
-                    content: format!("Received: {}", content),
-                    to: Some(stimulus.id),
-                })
-            }
-            StimulusKind::Drive(drive) => {
-                match drive {
-                    crate::core::stimulus::DriveEvent::Curiosity { domain, .. } => {
-                        Some(ConsciousAction::Observe {
-                            target: domain.clone(),
-                        })
-                    }
-                    crate::core::stimulus::DriveEvent::Boredom { recommendation, .. } => {
-                        Some(ConsciousAction::Refocus {
-                            target: "something_new".to_string(),
-                            reason: recommendation.clone(),
-                        })
-                    }
-                    _ => None,
+            StimulusKind::ExternalPrompt { content, .. } => Some(ConsciousAction::Respond {
+                content: format!("Received: {}", content),
+                to: Some(stimulus.id),
+            }),
+            StimulusKind::Drive(drive) => match drive {
+                crate::core::stimulus::DriveEvent::Curiosity { domain, .. } => {
+                    Some(ConsciousAction::Observe {
+                        target: domain.clone(),
+                    })
                 }
-            }
-            StimulusKind::FileSystem(_) => {
-                Some(ConsciousAction::Think {
-                    thought: "Noticed file change...".to_string(),
-                })
-            }
+                crate::core::stimulus::DriveEvent::Boredom { recommendation, .. } => {
+                    Some(ConsciousAction::Refocus {
+                        target: "something_new".to_string(),
+                        reason: recommendation.clone(),
+                    })
+                }
+                _ => None,
+            },
+            StimulusKind::FileSystem(_) => Some(ConsciousAction::Think {
+                thought: "Noticed file change...".to_string(),
+            }),
             _ => None,
         }
     }
@@ -600,7 +604,7 @@ impl StimulusProcessor for CognitiveProcessor {
             "What was I thinking about earlier?",
             "Is there something I'm forgetting?",
         ];
-        
+
         let idx = (context.cycle as usize) % thoughts.len();
         Some(ConsciousAction::Think {
             thought: thoughts[idx].to_string(),
@@ -634,10 +638,8 @@ mod tests {
 
     #[test]
     fn test_parse_response() {
-        let engine = CognitionEngine::new(
-            CognitionConfig::default(),
-            Box::new(MockLlmBackend::new()),
-        );
+        let engine =
+            CognitionEngine::new(CognitionConfig::default(), Box::new(MockLlmBackend::new()));
 
         let response = "ACTION: RESPOND\nCONTENT: Hello there!\nREASONING: Greeting the user";
         let parsed = engine.parse_response(response).unwrap();
@@ -649,10 +651,8 @@ mod tests {
 
     #[test]
     fn test_to_conscious_action() {
-        let engine = CognitionEngine::new(
-            CognitionConfig::default(),
-            Box::new(MockLlmBackend::new()),
-        );
+        let engine =
+            CognitionEngine::new(CognitionConfig::default(), Box::new(MockLlmBackend::new()));
 
         let parsed = ParsedAction {
             action_type: "THINK".to_string(),
@@ -666,10 +666,8 @@ mod tests {
 
     #[test]
     fn test_temperature_calculation() {
-        let engine = CognitionEngine::new(
-            CognitionConfig::default(),
-            Box::new(MockLlmBackend::new()),
-        );
+        let engine =
+            CognitionEngine::new(CognitionConfig::default(), Box::new(MockLlmBackend::new()));
 
         // High exploration should increase temperature
         let high_explore = EmotionalSnapshot {
@@ -700,10 +698,8 @@ mod tests {
 
     #[test]
     fn test_build_prompt() {
-        let engine = CognitionEngine::new(
-            CognitionConfig::default(),
-            Box::new(MockLlmBackend::new()),
-        );
+        let engine =
+            CognitionEngine::new(CognitionConfig::default(), Box::new(MockLlmBackend::new()));
 
         let context = CognitiveContext {
             stimulus: Some(ProcessedStimulus {

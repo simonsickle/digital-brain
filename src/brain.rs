@@ -23,6 +23,10 @@ use crate::regions::dmn::{
 use crate::regions::hippocampus::HippocampusStore;
 use crate::regions::prefrontal::{PrefrontalConfig, PrefrontalCortex};
 use crate::regions::schema::{Schema, SchemaCategory, SchemaStats, SchemaStore};
+use crate::regions::sensory_cortex::{
+    AuditoryCortex, CorticalRepresentation, GustatoryCortex, OlfactoryCortex, SomatosensoryCortex,
+    VisualCortex,
+};
 use crate::regions::stn::{STN, StopReason, StopSignal, TaskConfig, TaskId};
 use crate::regions::thalamus::{Destination, Thalamus};
 use crate::signal::{BrainSignal, MemoryTrace, Salience, SignalType};
@@ -68,6 +72,8 @@ pub struct ProcessingResult {
     pub errors: Vec<PredictionError>,
     /// Reflections triggered
     pub reflections: Vec<String>,
+    /// Cortical feature maps derived from sensory processing
+    pub cortical_features: Vec<CorticalRepresentation>,
 }
 
 /// The complete digital brain.
@@ -86,6 +92,16 @@ pub struct Brain {
     pub prediction: PredictionEngine,
     /// Self-model
     pub dmn: DefaultModeNetwork,
+    /// Visual feature extraction
+    pub visual_cortex: VisualCortex,
+    /// Auditory feature extraction
+    pub auditory_cortex: AuditoryCortex,
+    /// Somatosensory feature extraction
+    pub somatosensory_cortex: SomatosensoryCortex,
+    /// Gustatory feature extraction
+    pub gustatory_cortex: GustatoryCortex,
+    /// Olfactory feature extraction
+    pub olfactory_cortex: OlfactoryCortex,
     /// Neuromodulatory system (dopamine, serotonin, norepinephrine, acetylcholine)
     pub neuromodulators: NeuromodulatorySystem,
     /// Nervous system (inter-module signal routing)
@@ -140,6 +156,11 @@ impl Brain {
             workspace,
             prediction: PredictionEngine::new(),
             dmn: DefaultModeNetwork::new(),
+            visual_cortex: VisualCortex::new(),
+            auditory_cortex: AuditoryCortex::new(),
+            somatosensory_cortex: SomatosensoryCortex::new(),
+            gustatory_cortex: GustatoryCortex::new(),
+            olfactory_cortex: OlfactoryCortex::new(),
             neuromodulators: NeuromodulatorySystem::new(),
             nervous_system: NervousSystem::new(),
             schemas: SchemaStore::new(),
@@ -195,19 +216,24 @@ impl Brain {
                 predictions: Vec::new(),
                 errors: Vec::new(),
                 reflections: Vec::new(),
+                cortical_features: Vec::new(),
             });
         }
 
         let routed = &routed_signals[0];
+        let mut sensory_signal = routed.signal.clone();
+
+        let cortical_features =
+            self.process_sensory_cascade(&mut sensory_signal, &routed.destinations);
 
         // 3. Emotional tagging by amygdala
         // Record signal flowing to amygdala via nervous system
         self.nervous_system.transmit(
             BrainRegion::Thalamus,
             BrainRegion::Amygdala,
-            routed.signal.clone(),
+            sensory_signal.clone(),
         );
-        let tagged_signal = self.amygdala.tag_signal(routed.signal.clone());
+        let tagged_signal = self.amygdala.tag_signal(sensory_signal.clone());
         let emotion = self.amygdala.appraise(&tagged_signal);
 
         // 3.5 Neuromodulatory response to emotional content
@@ -241,6 +267,13 @@ impl Brain {
 
         for dest in &routed.destinations {
             match dest {
+                Destination::VisualCortex
+                | Destination::AuditoryCortex
+                | Destination::SomatosensoryCortex
+                | Destination::GustatoryCortex
+                | Destination::OlfactoryCortex => {
+                    // Already handled in sensory cascade; nothing else to do here.
+                }
                 Destination::Workspace => {
                     // Track signal to workspace via nervous system
                     self.nervous_system.transmit(
@@ -355,6 +388,7 @@ impl Brain {
             predictions: Vec::new(),
             errors: Vec::new(),
             reflections,
+            cortical_features,
         })
     }
 
@@ -420,6 +454,108 @@ impl Brain {
             memories_consolidated: consolidated_count,
             reflection: reflection.content,
         })
+    }
+
+    fn process_sensory_cascade(
+        &mut self,
+        signal: &mut BrainSignal,
+        destinations: &[Destination],
+    ) -> Vec<CorticalRepresentation> {
+        let mut outputs = Vec::new();
+
+        if destinations
+            .iter()
+            .any(|d| matches!(d, Destination::VisualCortex))
+            && let Some(rep) = self.visual_cortex.process(signal)
+        {
+            self.nervous_system.transmit(
+                BrainRegion::Thalamus,
+                BrainRegion::VisualCortex,
+                signal.clone(),
+            );
+            if let Ok(value) = serde_json::to_value(&rep) {
+                signal.metadata.insert("visual_features".to_string(), value);
+            }
+            outputs.push(rep);
+        }
+        if destinations
+            .iter()
+            .any(|d| matches!(d, Destination::AuditoryCortex))
+            && let Some(rep) = self.auditory_cortex.process(signal)
+        {
+            self.nervous_system.transmit(
+                BrainRegion::Thalamus,
+                BrainRegion::AuditoryCortex,
+                signal.clone(),
+            );
+            if let Ok(value) = serde_json::to_value(&rep) {
+                signal
+                    .metadata
+                    .insert("auditory_features".to_string(), value);
+            }
+            outputs.push(rep);
+        }
+        if destinations
+            .iter()
+            .any(|d| matches!(d, Destination::SomatosensoryCortex))
+            && let Some(rep) = self.somatosensory_cortex.process(signal)
+        {
+            self.nervous_system.transmit(
+                BrainRegion::Thalamus,
+                BrainRegion::SomatosensoryCortex,
+                signal.clone(),
+            );
+            if let Ok(value) = serde_json::to_value(&rep) {
+                signal
+                    .metadata
+                    .insert("somatosensory_features".to_string(), value);
+            }
+            outputs.push(rep);
+        }
+        if destinations
+            .iter()
+            .any(|d| matches!(d, Destination::GustatoryCortex))
+            && let Some(rep) = self.gustatory_cortex.process(signal)
+        {
+            self.nervous_system.transmit(
+                BrainRegion::Thalamus,
+                BrainRegion::GustatoryCortex,
+                signal.clone(),
+            );
+            if let Ok(value) = serde_json::to_value(&rep) {
+                signal
+                    .metadata
+                    .insert("gustatory_features".to_string(), value);
+            }
+            outputs.push(rep);
+        }
+        if destinations
+            .iter()
+            .any(|d| matches!(d, Destination::OlfactoryCortex))
+            && let Some(rep) = self.olfactory_cortex.process(signal)
+        {
+            self.nervous_system.transmit(
+                BrainRegion::Thalamus,
+                BrainRegion::OlfactoryCortex,
+                signal.clone(),
+            );
+            if let Ok(value) = serde_json::to_value(&rep) {
+                signal
+                    .metadata
+                    .insert("olfactory_features".to_string(), value);
+            }
+            outputs.push(rep);
+        }
+
+        if !outputs.is_empty()
+            && let Ok(value) = serde_json::to_value(&outputs)
+        {
+            signal
+                .metadata
+                .insert("cortical_features".to_string(), value);
+        }
+
+        outputs
     }
 
     /// Recall memories related to a query.

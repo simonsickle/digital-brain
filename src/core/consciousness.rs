@@ -27,10 +27,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::mpsc;
-use tokio::time::{interval, Duration as TokioDuration};
+use tokio::time::{Duration as TokioDuration, interval};
 use uuid::Uuid;
 
 use crate::core::sensory::SensoryCortex;
@@ -111,7 +111,10 @@ pub enum ConsciousAction {
     /// Generate a response (to prompt or internally)
     Respond { content: String, to: Option<Uuid> },
     /// Execute a tool/command
-    Execute { tool: String, args: serde_json::Value },
+    Execute {
+        tool: String,
+        args: serde_json::Value,
+    },
     /// Read/observe something
     Observe { target: String },
     /// Write/create something
@@ -164,8 +167,11 @@ pub struct ConsciousnessStats {
 /// Handler trait for processing stimuli and generating actions
 pub trait StimulusProcessor: Send + Sync {
     /// Process a stimulus and decide on action
-    fn process(&mut self, stimulus: &Stimulus, context: &ProcessingContext)
-        -> Option<ConsciousAction>;
+    fn process(
+        &mut self,
+        stimulus: &Stimulus,
+        context: &ProcessingContext,
+    ) -> Option<ConsciousAction>;
 
     /// Generate mind-wandering thought
     fn mind_wander(&mut self, context: &ProcessingContext) -> Option<ConsciousAction>;
@@ -711,6 +717,6 @@ mod tests {
         let result = consciousness.cycle();
 
         // Should have processed something
-        assert!(result.stimuli_processed > 0 || result.actions.len() > 0);
+        assert!(result.stimuli_processed > 0 || !result.actions.is_empty());
     }
 }

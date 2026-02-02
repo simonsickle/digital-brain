@@ -104,10 +104,10 @@ impl ActivityFingerprint {
     /// Calculate similarity to another fingerprint (0-1)
     pub fn similarity(&self, other: &ActivityFingerprint) -> f64 {
         // First check content hash if available (exact match)
-        if let (Some(h1), Some(h2)) = (self.content_hash, other.content_hash) {
-            if h1 == h2 {
-                return 1.0; // Exact match
-            }
+        if let (Some(h1), Some(h2)) = (self.content_hash, other.content_hash)
+            && h1 == h2
+        {
+            return 1.0; // Exact match
         }
 
         // Category match contributes to similarity
@@ -161,7 +161,10 @@ impl ActionEntropyTracker {
 
     /// Record an action
     pub fn record(&mut self, action_category: &str) {
-        *self.action_counts.entry(action_category.to_string()).or_insert(0) += 1;
+        *self
+            .action_counts
+            .entry(action_category.to_string())
+            .or_insert(0) += 1;
         self.total_actions += 1;
     }
 
@@ -259,7 +262,10 @@ impl ProgressTracker {
         let n = self.distances.len() as f64;
         let sum_x: f64 = (0..self.distances.len()).map(|i| i as f64).sum();
         let sum_y: f64 = self.distances.iter().sum();
-        let sum_xy: f64 = self.distances.iter().enumerate()
+        let sum_xy: f64 = self
+            .distances
+            .iter()
+            .enumerate()
             .map(|(i, y)| i as f64 * y)
             .sum();
         let sum_x2: f64 = (0..self.distances.len()).map(|i| (i as f64).powi(2)).sum();
@@ -380,7 +386,9 @@ impl BoredomTracker {
     /// Record an activity (action or output)
     pub fn record_activity(&mut self, fingerprint: ActivityFingerprint) {
         // Check similarity to recent activities
-        let max_similarity = self.recent_activities.iter()
+        let max_similarity = self
+            .recent_activities
+            .iter()
             .map(|a| fingerprint.similarity(a))
             .fold(0.0_f64, |a, b| a.max(b));
 
@@ -388,10 +396,10 @@ impl BoredomTracker {
         self.entropy_tracker.record(&fingerprint.category);
 
         // If window is full, remove oldest
-        if self.recent_activities.len() >= self.config.window_size {
-            if let Some(old) = self.recent_activities.pop_front() {
-                self.entropy_tracker.remove(&old.category);
-            }
+        if self.recent_activities.len() >= self.config.window_size
+            && let Some(old) = self.recent_activities.pop_front()
+        {
+            self.entropy_tracker.remove(&old.category);
         }
 
         // Add new activity
@@ -403,8 +411,8 @@ impl BoredomTracker {
             self.cycles_since_novelty += 1;
             if self.cycles_since_novelty > self.config.grace_period_cycles {
                 // Accumulate boredom for repetitive activity
-                self.level = (self.level + self.config.accumulation_rate)
-                    .min(self.config.max_level);
+                self.level =
+                    (self.level + self.config.accumulation_rate).min(self.config.max_level);
             }
         } else {
             // Novel activity - decay boredom
@@ -454,7 +462,7 @@ impl BoredomTracker {
         let factors = self.calculate_factors();
         let level = self.level();
         let triggered = level >= self.config.trigger_threshold;
-        
+
         let recommendation = if !triggered {
             BoredomRecommendation::Continue
         } else {
@@ -524,9 +532,12 @@ impl BoredomTracker {
         }
 
         let mean: f64 = self.recent_rewards.iter().sum::<f64>() / self.recent_rewards.len() as f64;
-        let variance: f64 = self.recent_rewards.iter()
+        let variance: f64 = self
+            .recent_rewards
+            .iter()
             .map(|r| (r - mean).powi(2))
-            .sum::<f64>() / self.recent_rewards.len() as f64;
+            .sum::<f64>()
+            / self.recent_rewards.len() as f64;
 
         variance
     }
@@ -588,10 +599,10 @@ impl BoredomTracker {
         self.level = (self.level - self.config.decay_rate * 0.2).max(0.0);
 
         // Increment novelty counter if no recent activity
-        if let Some(last) = self.last_activity {
-            if Utc::now() - last > Duration::seconds(60) {
-                self.cycles_since_novelty += 1;
-            }
+        if let Some(last) = self.last_activity
+            && Utc::now() - last > Duration::seconds(60)
+        {
+            self.cycles_since_novelty += 1;
         }
     }
 
@@ -638,10 +649,10 @@ pub struct BoredomStats {
 pub trait BoredomSignalSource {
     /// Get a fingerprint of the current output/activity
     fn activity_fingerprint(&self) -> ActivityFingerprint;
-    
+
     /// Get current distance to active goal (if any)
     fn goal_distance(&self) -> Option<f64>;
-    
+
     /// Get current reward/value signal
     fn reward_signal(&self) -> Option<f64>;
 }
@@ -680,7 +691,10 @@ mod tests {
         }
 
         // Should have low boredom due to diversity
-        assert!(tracker.level() < 0.3, "Diverse activities should not cause boredom");
+        assert!(
+            tracker.level() < 0.3,
+            "Diverse activities should not cause boredom"
+        );
     }
 
     #[test]
@@ -694,7 +708,11 @@ mod tests {
         }
 
         // Should have high boredom
-        assert!(tracker.level() > 0.5, "Repetitive activities should cause boredom: {}", tracker.level());
+        assert!(
+            tracker.level() > 0.5,
+            "Repetitive activities should cause boredom: {}",
+            tracker.level()
+        );
     }
 
     #[test]
@@ -713,7 +731,10 @@ mod tests {
         // Signal novelty
         tracker.signal_novelty();
 
-        assert!(tracker.level() < boredom_before, "Novelty should reduce boredom");
+        assert!(
+            tracker.level() < boredom_before,
+            "Novelty should reduce boredom"
+        );
     }
 
     #[test]
@@ -733,7 +754,10 @@ mod tests {
                 tracker.record(category);
             }
         }
-        assert!(tracker.normalized_entropy() > 0.9, "Uniform distribution should have high entropy");
+        assert!(
+            tracker.normalized_entropy() > 0.9,
+            "Uniform distribution should have high entropy"
+        );
     }
 
     #[test]
@@ -744,7 +768,10 @@ mod tests {
         for i in (0..10).rev() {
             tracker.record_distance(i as f64);
         }
-        assert!(tracker.progress_rate() < 0.0, "Decreasing distance = negative rate (progress)");
+        assert!(
+            tracker.progress_rate() < 0.0,
+            "Decreasing distance = negative rate (progress)"
+        );
         assert!(!tracker.is_stagnant());
 
         // Stagnant (distance not changing)
@@ -767,7 +794,7 @@ mod tests {
         }
 
         let assessment = tracker.assess();
-        
+
         // Should be triggered after repetitive activity
         if assessment.triggered {
             assert_ne!(assessment.recommendation, BoredomRecommendation::Continue);
@@ -788,7 +815,10 @@ mod tests {
         }
 
         // High boredom = exploration boost
-        assert!(tracker.exploration_boost() > 0.0, "Bored system should boost exploration");
+        assert!(
+            tracker.exploration_boost() > 0.0,
+            "Bored system should boost exploration"
+        );
     }
 
     #[test]

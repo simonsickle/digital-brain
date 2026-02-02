@@ -14,7 +14,7 @@ use chrono::{DateTime, Duration, Utc};
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc as async_mpsc;
@@ -23,9 +23,7 @@ use crate::core::boredom::{BoredomRecommendation, BoredomTracker};
 use crate::core::curiosity::CuriositySystem;
 use crate::core::goals::GoalManager;
 use crate::core::neuromodulators::NeuromodulatorySystem;
-use crate::core::stimulus::{
-    DriveEvent, FileEvent, Stimulus, StimulusKind, StimulusPriority, TimeEvent,
-};
+use crate::core::stimulus::{DriveEvent, FileEvent, Stimulus, StimulusPriority, TimeEvent};
 
 /// Trait for sensory input streams
 #[async_trait]
@@ -130,14 +128,14 @@ impl FileSystemStream {
     }
 
     /// Check if a path matches exclusion patterns
-    fn is_excluded(&self, path: &PathBuf) -> bool {
+    fn is_excluded(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy();
 
         for pattern in &self.config.exclude_patterns {
-            if let Ok(glob) = glob::Pattern::new(pattern) {
-                if glob.matches(&path_str) {
-                    return true;
-                }
+            if let Ok(glob) = glob::Pattern::new(pattern)
+                && glob.matches(&path_str)
+            {
+                return true;
             }
         }
         false
@@ -149,7 +147,7 @@ impl FileSystemStream {
 
         let path = event.paths.first()?.clone();
 
-        if self.is_excluded(&path) {
+        if self.is_excluded(path.as_path()) {
             return None;
         }
 
@@ -177,14 +175,14 @@ impl SensoryStream for FileSystemStream {
         }
 
         // Check for new events
-        if let Some(ref rx) = self.event_rx {
-            if let Ok(rx_guard) = rx.lock() {
-                while let Ok(result) = rx_guard.try_recv() {
-                    if let Ok(event) = result {
-                        if let Some(file_event) = self.convert_event(event) {
-                            stimuli.push(Stimulus::from_file_event(file_event));
-                        }
-                    }
+        if let Some(ref rx) = self.event_rx
+            && let Ok(rx_guard) = rx.lock()
+        {
+            while let Ok(result) = rx_guard.try_recv() {
+                if let Ok(event) = result
+                    && let Some(file_event) = self.convert_event(event)
+                {
+                    stimuli.push(Stimulus::from_file_event(file_event));
                 }
             }
         }
@@ -342,7 +340,6 @@ impl SensoryStream for ClockStream {
 pub struct PromptStream {
     name: String,
     rx: async_mpsc::Receiver<(String, Option<String>)>,
-    pending: VecDeque<(String, Option<String>)>,
     active: bool,
 }
 
@@ -377,7 +374,6 @@ impl PromptStream {
         let stream = Self {
             name: "prompt".to_string(),
             rx,
-            pending: VecDeque::new(),
             active: true,
         };
 
@@ -661,6 +657,7 @@ impl SensoryCortex {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::stimulus::StimulusKind;
 
     #[test]
     fn test_clock_stream_ticks() {
@@ -679,10 +676,9 @@ mod tests {
 
         // Should have at least one tick
         assert!(
-            stimuli.iter().any(|s| matches!(
-                s.kind,
-                StimulusKind::Time(TimeEvent::Tick { .. })
-            )),
+            stimuli
+                .iter()
+                .any(|s| matches!(s.kind, StimulusKind::Time(TimeEvent::Tick { .. }))),
             "Expected tick event"
         );
     }

@@ -22,7 +22,9 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-use super::traits::{ChatMessage, LlmBackend, LlmError, LlmErrorKind, LlmRequestConfig, LlmResponse, LlmUsage};
+use super::traits::{
+    ChatMessage, LlmBackend, LlmError, LlmErrorKind, LlmRequestConfig, LlmResponse, LlmUsage,
+};
 
 /// Anthropic API base URL
 const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
@@ -31,10 +33,11 @@ const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
 /// Available Claude models
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum AnthropicModel {
     /// Claude Opus 4.5 - Most capable
     #[serde(rename = "claude-opus-4-5-20250131")]
+    #[default]
     Opus4_5,
     /// Claude Sonnet 4 - Balanced
     #[serde(rename = "claude-sonnet-4-20250514")]
@@ -60,12 +63,6 @@ impl AnthropicModel {
             Self::Haiku3_5 => "claude-3-5-haiku-20241022",
             Self::Custom(s) => s,
         }
-    }
-}
-
-impl Default for AnthropicModel {
-    fn default() -> Self {
-        Self::Opus4_5
     }
 }
 
@@ -214,17 +211,16 @@ impl AnthropicBackend {
         };
 
         // Handle extended thinking for Opus 4.5
-        if matches!(self.config.model, AnthropicModel::Opus4_5) {
-            if let Some(budget) = config.extra.get("thinking_budget") {
-                if let Some(budget_val) = budget.as_u64() {
-                    request.thinking = Some(ThinkingConfig {
-                        thinking_type: "enabled".to_string(),
-                        budget_tokens: budget_val as u32,
-                    });
-                    // Temperature must be 1.0 for extended thinking
-                    request.temperature = Some(1.0);
-                }
-            }
+        if matches!(self.config.model, AnthropicModel::Opus4_5)
+            && let Some(budget) = config.extra.get("thinking_budget")
+            && let Some(budget_val) = budget.as_u64()
+        {
+            request.thinking = Some(ThinkingConfig {
+                thinking_type: "enabled".to_string(),
+                budget_tokens: budget_val as u32,
+            });
+            // Temperature must be 1.0 for extended thinking
+            request.temperature = Some(1.0);
         }
 
         request
@@ -250,17 +246,18 @@ impl AnthropicBackend {
             .with_finish_reason(response.stop_reason.unwrap_or_default());
 
         if let Some(usage) = response.usage {
-            llm_response = llm_response.with_usage(LlmUsage::new(
-                usage.input_tokens,
-                usage.output_tokens,
-            ));
+            llm_response =
+                llm_response.with_usage(LlmUsage::new(usage.input_tokens, usage.output_tokens));
         }
 
         Ok(llm_response)
     }
 
     /// Make API request with retries
-    async fn make_request(&self, request: &AnthropicRequest) -> Result<AnthropicResponse, LlmError> {
+    async fn make_request(
+        &self,
+        request: &AnthropicRequest,
+    ) -> Result<AnthropicResponse, LlmError> {
         let mut last_error = None;
 
         for attempt in 0..=self.config.max_retries {
@@ -298,9 +295,7 @@ impl AnthropicBackend {
                     let error = match status.as_u16() {
                         401 => LlmError::new("Invalid API key", LlmErrorKind::AuthError),
                         429 => LlmError::rate_limit("Rate limited"),
-                        500..=599 => {
-                            LlmError::new(error_body, LlmErrorKind::ServiceUnavailable)
-                        }
+                        500..=599 => LlmError::new(error_body, LlmErrorKind::ServiceUnavailable),
                         _ => LlmError::api_error(format!("HTTP {}: {}", status, error_body)),
                     };
 
@@ -365,10 +360,10 @@ impl LlmBackend for AnthropicBackend {
 
         // Extract system message if present
         let mut config = config.clone();
-        if config.system.is_none() {
-            if let Some(sys) = messages.iter().find(|m| m.role == "system") {
-                config.system = Some(sys.content.clone());
-            }
+        if config.system.is_none()
+            && let Some(sys) = messages.iter().find(|m| m.role == "system")
+        {
+            config.system = Some(sys.content.clone());
         }
 
         let request = self.build_request(&api_messages, &config);
@@ -452,7 +447,10 @@ mod tests {
     fn test_model_strings() {
         assert_eq!(AnthropicModel::Opus4_5.as_str(), "claude-opus-4-5-20250131");
         assert_eq!(AnthropicModel::Sonnet4.as_str(), "claude-sonnet-4-20250514");
-        assert_eq!(AnthropicModel::Haiku3_5.as_str(), "claude-3-5-haiku-20241022");
+        assert_eq!(
+            AnthropicModel::Haiku3_5.as_str(),
+            "claude-3-5-haiku-20241022"
+        );
     }
 
     #[test]
@@ -468,8 +466,7 @@ mod tests {
 
     #[test]
     fn test_backend_creation() {
-        let backend = AnthropicBackend::new("test-key")
-            .with_model(AnthropicModel::Opus4_5);
+        let backend = AnthropicBackend::new("test-key").with_model(AnthropicModel::Opus4_5);
 
         assert_eq!(backend.model_name(), "claude-opus-4-5-20250131");
         assert_eq!(backend.provider(), "anthropic");

@@ -5,131 +5,69 @@ Create a cognitive architecture indistinguishable from human cognition.
 
 ## What Makes Humans Human?
 
-### 1. Embodiment & Interoception ❌
-Humans have bodies. The brain constantly monitors:
-- Hunger, thirst, fatigue, pain, pleasure
-- Heartbeat, breathing, gut feelings
-- Physical comfort/discomfort
+### 1. Embodiment & Interoception ⚠️ (iterating)
+- **Current coverage:** `src/regions/hypothalamus.rs` models homeostatic drives and circadian rhythms; `src/regions/insula.rs` tracks body state, interoception, and affective mirroring; sensory cortices (`src/regions/sensory_cortex.rs`) transform thalamic input into modality-specific features.
+- **Next focus:** Feed autonomic feedback into attention/salience systems and surface bodily alerts through the global workspace.
 
-**Implementation:** Homeostatic drives, body state simulation
+### 2. Rich Emotional Life ⚠️ (iterating)
+- **Current coverage:** Discrete emotion appraisal lives in `src/core/emotion.rs` and the amygdala (`src/regions/amygdala.rs`), backed by neuromodulators for valence/arousal.
+- **Next focus:** Persist mood baselines, add regulation strategies, and link emotion trajectories to decision making.
 
-### 2. Rich Emotional Life ⚠️ (partial)
-Beyond valence/arousal:
-- Discrete emotions (joy, fear, anger, sadness, surprise, disgust, contempt)
-- Emotion blends and transitions
-- Mood (long-term emotional states)
-- Emotion regulation strategies
+### 3. Self-Model & Metacognition ⚠️ (iterating)
+- **Current coverage:** The DMN (`src/regions/dmn.rs`) and self-model (`src/core/self_model.rs`) maintain identity, beliefs, and metacognitive traces.
+- **Next focus:** Expand theory-of-mind reasoning, narrative coherence, and integration with social cognition signals.
 
-**Have:** Basic valence/arousal
-**Need:** Full emotion model, regulation, moods
+### 4. Inner Speech & Narrative ✅
+- **Current coverage:** `src/core/inner_speech.rs` generates self-talk, rehearsal, and narrative buffers that synchronize with the DMN.
+- **Next focus:** Couple inner speech with upcoming language cortex modules for grounded verbal reasoning.
 
-### 3. Self-Model & Metacognition ❌
-Humans know they exist:
-- Self-awareness ("I am thinking")
-- Self-concept (who am I?)
-- Metacognitive monitoring (knowing what you know)
-- Theory of mind (others have minds too)
-- Autobiographical narrative
-
-**Implementation:** Self-model module, metacognitive monitor
-
-### 4. Inner Speech & Narrative ❌
-Humans think in words:
-- Internal monologue
-- Verbal rehearsal
-- Narrative self-construction
-- "Talking to yourself"
-
-**Implementation:** Inner speech generator, narrative memory
-
-### 5. Sleep & Dreams ❌
-Critical for cognition:
-- Memory consolidation during sleep
-- REM dreams (narrative, emotional processing)
-- Slow-wave sleep (declarative memory)
-- Creativity boost from incubation
-
-**Implementation:** Sleep cycle, dream generation, offline consolidation
+### 5. Sleep & Dreams ⚠️ (iterating)
+- **Current coverage:** `src/core/sleep.rs` orchestrates multi-stage sleep, dream generation via the imagination engine, and exposes `Brain::sleep`.
+- **Next focus:** Tie sleep pressure to hypothalamic drives, log dream insights, and trigger schema updates post-REM.
 
 ### 6. Predictive Processing ⚠️ (partial)
-Brain as prediction machine:
-- Constantly predicting sensory input
-- Prediction errors drive learning
-- Hierarchical predictions
-- Active inference (act to confirm predictions)
-
-**Have:** Basic prediction engine
-**Need:** Hierarchical predictive coding, active inference
+- **Current coverage:** `src/core/prediction.rs` delivers prediction error signals and gating via neuromodulators and basal ganglia.
+- **Next focus:** Introduce hierarchical predictive coding and active inference loops that can spawn exploratory actions.
 
 ### 7. Attention Networks ⚠️ (partial)
-Multiple attention systems:
-- Dorsal (top-down, goal-directed)
-- Ventral (bottom-up, salience/surprise)
-- Executive control
-- Mind-wandering (DMN)
-
-**Have:** Basic attention, DMN
-**Need:** Full network model
+- **Current coverage:** Attention budgeting (`src/core/attention.rs`), thalamic gating, and prefrontal focus provide baseline competition.
+- **Next focus:** Separate dorsal/ventral attention pathways, add salience network coordination, and refine mind-wandering control.
 
 ### 8. Social Cognition ⚠️ (partial)
-Humans are deeply social:
-- Face/emotion recognition
-- Theory of mind
-- Social hierarchy awareness
-- Reputation tracking
-- Empathy/mirroring
+- **Current coverage:** Trust/oxytocin signalling, empathic insula responses, and multi-agent messaging support proto-social awareness.
+- **Next focus:** Build explicit theory-of-mind models, social hierarchy tracking, and reputation-weighted decision policies.
 
-**Have:** Oxytocin/trust system
-**Need:** Full social cognition
+### 9. Temporal Cognition ✅
+- **Implemented:** `src/core/temporal.rs` handles duration perception, mental time travel, prospective memory, and temporal discounting.
+- **Next focus:** Close the loop with goal scheduling and episodic simulation for proactive planning.
 
-### 9. Temporal Cognition ✅ (NEW!)
-Humans experience time:
-- Sense of duration ✅
-- Mental time travel (past/future) ✅
-- Prospective memory (remembering to remember) ✅
-- Temporal discounting ✅
-
-**Implemented:** `src/core/temporal.rs` (858 lines, 10 tests)
-- DurationPerception: Internal clock with arousal/attention modulation
-- MentalTimeTravel: Past moments and future anticipation
-- ProspectiveMemory: Time/event/activity-based intentions
-- TemporalDiscounting: Hyperbolic discounting for patient decisions
-
-### 10. Creativity & Imagination ❌
-Going beyond the given:
-- Counterfactual thinking
-- Mental simulation
-- Analogical reasoning
-- Recombination of concepts
-
-**Implementation:** Imagination engine, conceptual blending
+### 10. Creativity & Imagination ⚠️ (partial)
+- **Current coverage:** `src/core/imagination.rs` recombines memories, generates counterfactuals, and fuels dream content.
+- **Next focus:** Embed imagination outputs into action selection, analogy making, and creative problem solving pipelines.
 
 ---
 
 ## Implementation Priority
 
-### Phase 1: Core Self (Current Sprint)
-1. ✅ Consciousness loop
-2. ✅ Sensory streams
-3. ✅ Boredom/curiosity
-4. 🔨 **Emotion system** (full discrete emotions)
-5. 🔨 **Self-model** (metacognition, self-awareness)
-6. 🔨 **Inner speech** (verbal thought)
+### Phase A: Sensory Foundations
+1. ✅ Build cortical sensory modules (visual, auditory, somatosensory, gustatory, olfactory) downstream of the thalamus (`src/regions/sensory_cortex.rs` + thalamus/nervous system integration).
+2. Add posterior parietal integration to bind multimodal context before workspace broadcast.
+3. Connect sensory abstractions to schema and world-model stores for richer grounding.
 
-### Phase 2: Offline Processing
-7. Sleep cycle & dreams
-8. Memory consolidation
-9. Incubation/creativity
+### Phase B: Motor & Autonomic Control
+4. Implement motor cortex layers that translate basal ganglia output into structured actions.
+5. Extend cerebellar forward models and motor imagery, closing loops with the imagination engine.
+6. Simulate brainstem autonomic centres to give hypothalamus/insula real-time feedback.
 
-### Phase 3: Social & Temporal
-10. Theory of mind
-11. Time perception
-12. Prospective memory
+### Phase C: Salience & Social Reasoning
+7. Formalize dorsal/ventral attention and the salience network (anterior insula + dorsal ACC).
+8. Expand social cognition with theory-of-mind reasoning, reputation tracking, and mirror-system support.
+9. Link mood, social context, and attention selection through shared neuromodulator tuning.
 
-### Phase 4: Higher Cognition
-13. Imagination engine
-14. Analogical reasoning
-15. Full predictive processing
+### Phase D: Predictive & Generative Mastery
+10. Layer hierarchical predictive coding and active inference into perception/action loops.
+11. Integrate imagination outputs with planning and goal management for creative problem solving.
+12. Instrument mood and sleep data to adapt long-horizon strategies and self-narratives.
 
 ---
 

@@ -71,6 +71,16 @@ pub enum Destination {
     Hippocampus,
     /// Send to amygdala for emotional processing
     Amygdala,
+    /// Send to visual cortex for feature extraction
+    VisualCortex,
+    /// Send to auditory cortex for feature extraction
+    AuditoryCortex,
+    /// Send to somatosensory cortex for feature extraction
+    SomatosensoryCortex,
+    /// Send to gustatory cortex for feature extraction
+    GustatoryCortex,
+    /// Send to olfactory cortex for feature extraction
+    OlfactoryCortex,
     /// Send to prefrontal for working memory
     Prefrontal,
     /// Send to global workspace for broadcast
@@ -251,6 +261,11 @@ impl Thalamus {
                 if signal.salience.is_high() {
                     destinations.push(Destination::Workspace);
                 }
+                for cortex in self.infer_sensory_destinations(signal) {
+                    if !destinations.contains(&cortex) {
+                        destinations.push(cortex);
+                    }
+                }
             }
             SignalType::Memory => {
                 destinations.push(Destination::Hippocampus);
@@ -353,6 +368,128 @@ impl Thalamus {
     pub fn buffer_len(&self) -> usize {
         self.input_buffer.len()
     }
+}
+
+impl Thalamus {
+    fn infer_sensory_destinations(&self, signal: &BrainSignal) -> Vec<Destination> {
+        fn modality_from_metadata(signal: &BrainSignal) -> Option<String> {
+            signal
+                .metadata
+                .get("modality")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_ascii_lowercase())
+        }
+
+        let content = signal
+            .content
+            .as_str()
+            .map(|s| s.to_ascii_lowercase())
+            .unwrap_or_else(|| signal.content.to_string().to_ascii_lowercase());
+
+        let mut destinations = Vec::new();
+
+        if let Some(modality) = modality_from_metadata(signal) {
+            match modality.as_str() {
+                "visual" => destinations.push(Destination::VisualCortex),
+                "auditory" => destinations.push(Destination::AuditoryCortex),
+                "somatosensory" | "tactile" | "touch" => {
+                    destinations.push(Destination::SomatosensoryCortex)
+                }
+                "gustatory" | "taste" => destinations.push(Destination::GustatoryCortex),
+                "olfactory" | "smell" => destinations.push(Destination::OlfactoryCortex),
+                "multi" | "multimodal" => {
+                    destinations.extend([
+                        Destination::VisualCortex,
+                        Destination::AuditoryCortex,
+                        Destination::SomatosensoryCortex,
+                    ]);
+                }
+                _ => {}
+            }
+        }
+
+        // Keyword-based fallback if metadata absent or ambiguous
+        if destinations.is_empty() {
+            if contains_any(
+                &content,
+                &[
+                    "see", "look", "watch", "bright", "dark", "color", "vision", "image", "visual",
+                    "shape",
+                ],
+            ) {
+                destinations.push(Destination::VisualCortex);
+            }
+            if contains_any(
+                &content,
+                &[
+                    "hear", "listen", "sound", "music", "voice", "auditory", "noise", "tone",
+                    "melody",
+                ],
+            ) {
+                destinations.push(Destination::AuditoryCortex);
+            }
+            if contains_any(
+                &content,
+                &[
+                    "touch",
+                    "feel",
+                    "pressure",
+                    "pain",
+                    "warm",
+                    "cold",
+                    "texture",
+                    "somatic",
+                    "somatosensory",
+                    "tingle",
+                ],
+            ) {
+                destinations.push(Destination::SomatosensoryCortex);
+            }
+            if contains_any(
+                &content,
+                &[
+                    "taste",
+                    "flavor",
+                    "sweet",
+                    "sour",
+                    "bitter",
+                    "salty",
+                    "umami",
+                    "savory",
+                    "gustatory",
+                ],
+            ) {
+                destinations.push(Destination::GustatoryCortex);
+            }
+            if contains_any(
+                &content,
+                &[
+                    "smell",
+                    "scent",
+                    "aroma",
+                    "fragrance",
+                    "odor",
+                    "olfactory",
+                    "perfume",
+                    "stink",
+                    "musty",
+                ],
+            ) {
+                destinations.push(Destination::OlfactoryCortex);
+            }
+        }
+
+        if destinations.is_empty() {
+            // Default to visual and auditory for generic sensory content
+            destinations.extend([Destination::VisualCortex, Destination::AuditoryCortex]);
+        }
+
+        destinations
+    }
+}
+
+fn contains_any(text: &str, keywords: &[&str]) -> bool {
+    keywords.iter().any(|kw| text.contains(kw))
 }
 
 impl Default for Thalamus {
