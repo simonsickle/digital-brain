@@ -11,6 +11,7 @@ use crate::core::neuromodulators::{
     NeuromodulatorState, NeuromodulatorySystem, RewardCategory, RewardQuality,
 };
 use crate::core::prediction::{Prediction, PredictionEngine, PredictionError};
+use crate::core::salience::{SalienceInputs, SalienceNetwork};
 use crate::core::workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
 use crate::error::{BrainError, Result};
 use crate::regions::acc::{ACC, ControlSignal};
@@ -127,6 +128,8 @@ pub struct Brain {
     pub schemas: SchemaStore,
     /// Attention budget (resource allocation)
     pub attention: AttentionBudget,
+    /// Salience network (dorsal/ventral attention coordination)
+    pub salience_network: SalienceNetwork,
     /// Action selection and habit formation
     pub basal_ganglia: BasalGanglia,
     /// Error detection and conflict monitoring
@@ -187,6 +190,7 @@ impl Brain {
             nervous_system: NervousSystem::new(),
             schemas: SchemaStore::new(),
             attention: AttentionBudget::new(100_000), // 100k token budget
+            salience_network: SalienceNetwork::new(),
             basal_ganglia: BasalGanglia::new(),
             acc: ACC::new(),
             cerebellum: Cerebellum::new(),
@@ -282,8 +286,32 @@ impl Brain {
             BrainRegion::Amygdala,
             sensory_signal.clone(),
         );
-        let tagged_signal = self.amygdala.tag_signal(sensory_signal.clone());
+        let mut tagged_signal = self.amygdala.tag_signal(sensory_signal.clone());
         let emotion = self.amygdala.appraise(&tagged_signal);
+
+        let salience_outcome = self.salience_network.update(
+            &tagged_signal,
+            SalienceInputs {
+                cognitive_load: self.acc.cognitive_load(),
+                interoceptive_alert: self.insula.body_state.is_alert(),
+                stress_level: self.hypothalamus.stress.level(),
+            },
+        );
+
+        if let Some(focus) = &salience_outcome.focus {
+            self.thalamus.focus_attention(focus);
+        }
+
+        if salience_outcome.salience_boost.abs() > 0.0 {
+            tagged_signal.salience =
+                Salience::new(tagged_signal.salience.value() + salience_outcome.salience_boost);
+            tagged_signal.priority += salience_outcome.priority_boost;
+        }
+        if let Ok(value) = serde_json::to_value(&salience_outcome) {
+            tagged_signal
+                .metadata
+                .insert("salience_network".to_string(), value);
+        }
 
         // 3.5 Neuromodulatory response to emotional content
         if emotion.is_significant {

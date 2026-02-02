@@ -14,6 +14,7 @@ pub mod llm;
 pub mod nervous_system;
 pub mod neuromodulators;
 pub mod prediction;
+pub mod salience;
 pub mod self_model;
 pub mod sensory;
 pub mod sleep;
@@ -72,6 +73,7 @@ pub use neuromodulators::{
     TrustLevel,
 };
 pub use prediction::{Prediction, PredictionEngine, PredictionError, PredictionStats};
+pub use salience::{SalienceInputs, SalienceNetwork, SalienceOutcome};
 pub use self_model::{
     AutobiographicalSelf, LifeChapter, LifeEvent, MetacognitiveMonitor, MetacognitiveState,
     SelfConcept, SelfModel, SelfTrait, Value,
