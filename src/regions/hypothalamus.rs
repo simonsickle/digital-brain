@@ -58,14 +58,14 @@ impl DriveType {
     /// Get the typical decay rate (how fast this drive builds up)
     pub fn decay_rate(&self) -> f64 {
         match self {
-            Self::Hunger => 0.01,      // Builds slowly
-            Self::Thirst => 0.015,     // Builds faster than hunger
-            Self::Fatigue => 0.008,    // Builds very slowly
-            Self::Social => 0.005,     // Builds slowly
-            Self::Safety => 0.0,       // Event-driven, not time-based
-            Self::Stimulation => 0.02, // Builds quickly (boredom)
-            Self::Achievement => 0.003,// Builds very slowly
-            Self::Autonomy => 0.002,   // Builds very slowly
+            Self::Hunger => 0.01,       // Builds slowly
+            Self::Thirst => 0.015,      // Builds faster than hunger
+            Self::Fatigue => 0.008,     // Builds very slowly
+            Self::Social => 0.005,      // Builds slowly
+            Self::Safety => 0.0,        // Event-driven, not time-based
+            Self::Stimulation => 0.02,  // Builds quickly (boredom)
+            Self::Achievement => 0.003, // Builds very slowly
+            Self::Autonomy => 0.002,    // Builds very slowly
         }
     }
 
@@ -196,11 +196,11 @@ impl CircadianPhase {
     /// Get alertness modifier for this phase
     pub fn alertness_modifier(&self) -> f64 {
         match self {
-            Self::Morning => 0.7,    // Waking up
-            Self::Day => 1.0,        // Peak alertness
-            Self::Afternoon => 0.8,  // Post-lunch dip
-            Self::Evening => 0.6,    // Winding down
-            Self::Night => 0.3,      // Should be sleeping
+            Self::Morning => 0.7,   // Waking up
+            Self::Day => 1.0,       // Peak alertness
+            Self::Afternoon => 0.8, // Post-lunch dip
+            Self::Evening => 0.6,   // Winding down
+            Self::Night => 0.3,     // Should be sleeping
         }
     }
 
@@ -434,7 +434,8 @@ impl Hypothalamus {
 
         // Update drives (they build up over time)
         for (drive_type, state) in &mut self.drives {
-            let increase = drive_type.decay_rate() * elapsed_minutes * self.config.drive_buildup_rate;
+            let increase =
+                drive_type.decay_rate() * elapsed_minutes * self.config.drive_buildup_rate;
             state.increase(increase);
         }
 
@@ -474,10 +475,7 @@ impl Hypothalamus {
 
     /// Get all urgent drives
     pub fn urgent_drives(&self) -> Vec<(&DriveType, &DriveState)> {
-        self.drives
-            .iter()
-            .filter(|(_, s)| s.is_urgent())
-            .collect()
+        self.drives.iter().filter(|(_, s)| s.is_urgent()).collect()
     }
 
     /// Trigger stress response
@@ -500,7 +498,8 @@ impl Hypothalamus {
     /// Get overall motivational state
     pub fn motivation_summary(&self) -> MotivationSummary {
         let total_drive: f64 = self.drives.values().map(|d| d.motivation()).sum();
-        let urgent: Vec<String> = self.urgent_drives()
+        let urgent: Vec<String> = self
+            .urgent_drives()
             .iter()
             .map(|(dt, _)| format!("{:?}", dt))
             .collect();
@@ -638,7 +637,10 @@ mod tests {
         let mut hypo = Hypothalamus::new();
 
         // Increase hunger
-        hypo.drives.get_mut(&DriveType::Hunger).unwrap().increase(0.8);
+        hypo.drives
+            .get_mut(&DriveType::Hunger)
+            .unwrap()
+            .increase(0.8);
 
         let urgent = hypo.urgent_drives();
         assert!(!urgent.is_empty());
