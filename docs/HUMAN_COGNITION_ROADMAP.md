@@ -5,9 +5,9 @@ Create a cognitive architecture indistinguishable from human cognition.
 
 ## What Makes Humans Human?
 
-### 1. Embodiment & Interoception ⚠️ (iterating)
+### 1. Embodiment & Interoception ✅
 - **Current coverage:** `src/regions/hypothalamus.rs` models homeostatic drives and circadian rhythms; `src/regions/insula.rs` tracks body state, interoception, and affective mirroring; sensory cortices (`src/regions/sensory_cortex.rs`) transform thalamic input into modality-specific features.
-- **Next focus:** Feed autonomic feedback into attention/salience systems and surface bodily alerts through the global workspace.
+- **Implemented:** Autonomic feedback now generates interoceptive alerts, feeds the salience/attention pathways, and surfaces bodily signals through the global workspace.
 
 ### 2. Rich Emotional Life ⚠️ (iterating)
 - **Current coverage:** Discrete emotion appraisal lives in `src/core/emotion.rs` and the amygdala (`src/regions/amygdala.rs`), backed by neuromodulators for valence/arousal.

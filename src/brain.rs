@@ -90,6 +90,31 @@ pub struct ProcessingResult {
     pub multimodal_context: Option<MultimodalContext>,
 }
 
+#[derive(Debug, Clone)]
+struct InteroceptiveAlert {
+    summary: String,
+    severity: f64,
+    salience: f64,
+    valence: f64,
+    arousal: f64,
+    priority: i32,
+    tags: Vec<String>,
+}
+
+impl InteroceptiveAlert {
+    fn to_metadata(&self) -> serde_json::Value {
+        serde_json::json!({
+            "summary": self.summary,
+            "severity": self.severity,
+            "salience": self.salience,
+            "valence": self.valence,
+            "arousal": self.arousal,
+            "priority": self.priority,
+            "tags": self.tags,
+        })
+    }
+}
+
 /// The complete digital brain.
 pub struct Brain {
     /// Sensory gateway
@@ -148,6 +173,10 @@ pub struct Brain {
     pub stn: STN,
     /// Processing cycle count
     cycle_count: u64,
+    /// Last interoceptive alert summary (for throttling)
+    last_interoceptive_alert: Option<String>,
+    /// Cycle count when last interoceptive alert was emitted
+    last_interoceptive_alert_cycle: u64,
     /// Configuration
     #[allow(dead_code)]
     config: BrainConfig,
@@ -205,6 +234,8 @@ impl Brain {
             cerebellum: Cerebellum::new(),
             stn: STN::new(),
             cycle_count: 0,
+            last_interoceptive_alert: None,
+            last_interoceptive_alert_cycle: 0,
             config,
         })
     }
@@ -808,6 +839,65 @@ impl Brain {
 
         self.apply_autonomic_feedback(&feedback);
 
+        if let Some(alert) = self.build_interoceptive_alert(&feedback) {
+            let should_emit = self.should_emit_interoceptive_alert(&alert);
+            if should_emit {
+                let mut signal = BrainSignal::new("insula", SignalType::Sensory, &alert.summary)
+                    .with_salience(alert.salience)
+                    .with_valence(alert.valence)
+                    .with_arousal(alert.arousal);
+                signal.priority += alert.priority;
+                signal
+                    .metadata
+                    .insert("interoceptive_alert".to_string(), alert.to_metadata());
+                if let Ok(value) = serde_json::to_value(&feedback) {
+                    signal
+                        .metadata
+                        .insert("autonomic_feedback".to_string(), value);
+                }
+
+                let nm_state = self.neuromodulators.state();
+                let salience_outcome = self.salience_network.update(
+                    &signal,
+                    SalienceInputs {
+                        cognitive_load: self.acc.cognitive_load(),
+                        interoceptive_alert: true,
+                        stress_level: feedback.stress_signal,
+                        mood_stability: nm_state.mood_stability,
+                        social_affinity: nm_state.oxytocin,
+                    },
+                );
+
+                if let Some(focus) = &salience_outcome.focus {
+                    self.thalamus.focus_attention(focus);
+                }
+
+                if salience_outcome.salience_boost.abs() > 0.0 {
+                    signal.salience = Salience::new(
+                        (signal.salience.value() + salience_outcome.salience_boost).clamp(0.0, 1.0),
+                    );
+                    signal.priority += salience_outcome.priority_boost;
+                }
+                let min_salience = if alert.severity > 0.0 { 0.35 } else { 0.3 };
+                if signal.salience.value() < min_salience {
+                    signal.salience = Salience::new(min_salience);
+                }
+                if let Ok(value) = serde_json::to_value(&salience_outcome) {
+                    signal
+                        .metadata
+                        .insert("salience_network".to_string(), value);
+                }
+
+                self.nervous_system.transmit(
+                    BrainRegion::Insula,
+                    BrainRegion::Workspace,
+                    signal.clone(),
+                );
+                self.workspace.submit(signal);
+                self.record_interoceptive_alert(&alert);
+            }
+        }
+
         if let Ok(value) = serde_json::to_value(&feedback) {
             let signal = BrainSignal::new("brainstem", SignalType::Sensory, feedback)
                 .with_salience(0.4)
@@ -820,6 +910,98 @@ impl Brain {
             self.nervous_system
                 .transmit(BrainRegion::Brainstem, BrainRegion::Hypothalamus, signal);
         }
+    }
+
+    fn build_interoceptive_alert(
+        &self,
+        feedback: &AutonomicFeedback,
+    ) -> Option<InteroceptiveAlert> {
+        let body = &feedback.body_state;
+        let mut tags: Vec<String> = Vec::new();
+        let mut severity: f64 = 0.0;
+
+        if feedback.stress_signal > 0.3 {
+            tags.push("stress".to_string());
+            severity = severity.max(feedback.stress_signal);
+        }
+        if feedback.drive_pressure > 0.4 {
+            tags.push("drive_pressure".to_string());
+            severity = severity.max(feedback.drive_pressure);
+        }
+
+        let fatigue = (1.0 - body.energy).clamp(0.0, 1.0);
+        if fatigue > 0.5 {
+            tags.push("fatigue".to_string());
+            severity = severity.max(fatigue);
+        }
+        if body.gut < -0.4 {
+            tags.push("hunger".to_string());
+            severity = severity.max(body.gut.abs());
+        }
+        if body.pain > 0.3 {
+            tags.push("pain".to_string());
+            severity = severity.max(body.pain);
+        }
+        if body.temperature.abs() > 0.4 {
+            tags.push("temperature".to_string());
+            severity = severity.max(body.temperature.abs());
+        }
+        if body.tension > 0.6 {
+            tags.push("tension".to_string());
+            severity = severity.max(body.tension);
+        }
+        if body.heart_rate > 1.05 || body.breathing > 0.45 {
+            tags.push("arousal_shift".to_string());
+            severity = severity.max(body.arousal());
+        }
+        if body.is_alert() {
+            tags.push("physiological_alert".to_string());
+            severity = severity.max(body.arousal());
+        }
+
+        if tags.is_empty() {
+            return None;
+        }
+
+        let summary = if tags.is_empty() {
+            "Interoceptive alert: bodily shift".to_string()
+        } else {
+            format!("Interoceptive alert: {}", tags.join(", "))
+        };
+        let salience = (0.4 + severity * 0.5).clamp(0.3, 0.95);
+        let priority = if severity > 0.85 {
+            2
+        } else if severity > 0.65 {
+            1
+        } else {
+            0
+        };
+
+        Some(InteroceptiveAlert {
+            summary,
+            severity,
+            salience,
+            valence: body.valence(),
+            arousal: body.arousal(),
+            priority,
+            tags,
+        })
+    }
+
+    fn should_emit_interoceptive_alert(&self, alert: &InteroceptiveAlert) -> bool {
+        let cooldown = 3;
+        let last_summary = self.last_interoceptive_alert.as_deref();
+        if last_summary != Some(alert.summary.as_str()) {
+            return true;
+        }
+        self.cycle_count
+            .saturating_sub(self.last_interoceptive_alert_cycle)
+            >= cooldown
+    }
+
+    fn record_interoceptive_alert(&mut self, alert: &InteroceptiveAlert) {
+        self.last_interoceptive_alert = Some(alert.summary.clone());
+        self.last_interoceptive_alert_cycle = self.cycle_count;
     }
 
     fn apply_autonomic_feedback(&mut self, feedback: &AutonomicFeedback) {
@@ -2248,6 +2430,22 @@ mod tests {
 
         let updated = brain.insula.body_state.heart_rate;
         assert!(updated >= initial);
+    }
+
+    #[test]
+    fn test_interoceptive_alert_reaches_workspace() {
+        let mut brain = Brain::new().unwrap();
+
+        brain.hypothalamus.trigger_stress(0.9);
+        brain.update_autonomic_cycle();
+
+        let broadcasts = brain.workspace.process_cycle();
+        assert!(
+            broadcasts
+                .iter()
+                .any(|b| b.signal.metadata.contains_key("interoceptive_alert")),
+            "Expected interoceptive alert to reach the workspace"
+        );
     }
 
     #[test]
