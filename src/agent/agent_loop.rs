@@ -30,6 +30,7 @@ use crate::core::goals::{Goal, GoalEvent, GoalId, GoalManager};
 use crate::core::imagination::Imagining;
 use crate::core::neuromodulators::NeuromodulatorState;
 use crate::core::planning::{ImaginationPlanner, PlanningSuggestion};
+use crate::core::temporal::{Intention, ProspectiveTrigger, TemporalCognition, TemporalMoment};
 use crate::signal::Valence;
 
 /// Types of percepts the agent can receive
@@ -277,6 +278,8 @@ pub struct AgentLoop {
     goal_manager: GoalManager,
     /// Imagination planner (creative → actionable)
     imagination_planner: ImaginationPlanner,
+    /// Temporal cognition (prospective memory + time travel)
+    temporal: TemporalCognition,
     /// Buffered imaginations awaiting planning
     imagination_buffer: Vec<Imagining>,
     /// Current agent state
@@ -306,6 +309,7 @@ impl AgentLoop {
             action_selector,
             goal_manager: GoalManager::new(),
             imagination_planner: ImaginationPlanner::default(),
+            temporal: TemporalCognition::new(),
             imagination_buffer: Vec::new(),
             state: AgentState::default(),
             percept_buffer: Vec::new(),
@@ -358,8 +362,10 @@ impl AgentLoop {
     /// Add a goal
     pub fn add_goal(&mut self, goal: Goal) -> GoalId {
         let description = goal.description.clone();
+        let goal_snapshot = goal.clone();
         let id = self.goal_manager.add(goal);
         self.state.active_goals.push(description);
+        self.register_temporal_goal(&goal_snapshot);
         id
     }
 
@@ -377,6 +383,9 @@ impl AgentLoop {
 
     /// Decompose a goal into subgoals
     pub fn decompose_goal(&mut self, goal_id: GoalId, subgoals: Vec<Goal>) -> Vec<GoalId> {
+        for subgoal in &subgoals {
+            self.register_temporal_goal(subgoal);
+        }
         self.goal_manager.decompose(goal_id, subgoals)
     }
 
@@ -425,6 +434,17 @@ impl AgentLoop {
         let mut outputs = Vec::new();
         let mut goal_events = Vec::new();
 
+        // Update temporal cognition based on current neuromodulators
+        self.temporal.update(
+            self.state.neuromodulators.norepinephrine,
+            self.state.neuromodulators.learning_depth,
+            (1.0 - self.state.neuromodulators.motivation).clamp(0.0, 1.0),
+            self.state.neuromodulators.serotonin,
+            self.state.neuromodulators.dopamine,
+            self.state.neuromodulators.stress,
+        );
+        self.inject_prospective_intentions(&mut outputs);
+
         // 1. Process percepts
         let percepts_processed = self.process_percepts(&mut outputs);
 
@@ -435,6 +455,7 @@ impl AgentLoop {
         self.update_active_goals();
         goal_events.extend(self.goal_manager.events().iter().cloned());
         self.goal_manager.clear_events();
+        self.record_temporal_goal_events(&goal_events);
 
         // Update stats from goal events
         for event in &goal_events {
@@ -598,6 +619,7 @@ impl AgentLoop {
         for goal in &suggestion.goals {
             if !self.has_similar_goal(&goal.description) {
                 self.goal_manager.add(goal.clone());
+                self.register_temporal_goal(goal);
                 goals_added += 1;
             }
         }
@@ -610,6 +632,104 @@ impl AgentLoop {
         }
 
         (goals_added, actions_added)
+    }
+
+    fn register_temporal_goal(&mut self, goal: &Goal) {
+        if let Some(deadline) = goal.deadline {
+            let reminder_time = if deadline > Utc::now() + chrono::Duration::hours(1) {
+                deadline - chrono::Duration::hours(1)
+            } else {
+                deadline
+            };
+            let priority = ((goal.priority.as_f64() + goal.urgency()) / 2.0).clamp(0.0, 1.0);
+            let intention = Intention::new(
+                format!("Review goal: {}", goal.description),
+                ProspectiveTrigger::Time(reminder_time),
+            )
+            .with_priority(priority)
+            .with_goal(goal.id.to_string());
+            self.temporal.prospective.intend(intention);
+
+            let moment =
+                TemporalMoment::future(deadline, format!("Goal deadline: {}", goal.description))
+                    .with_valence(0.2)
+                    .with_vividness(0.4)
+                    .with_confidence(0.6)
+                    .with_tag("goal");
+            self.temporal.time_travel.anticipate(moment);
+        }
+    }
+
+    fn inject_prospective_intentions(&mut self, outputs: &mut Vec<AgentOutput>) {
+        let context = self
+            .goal_manager
+            .active_goals()
+            .iter()
+            .map(|g| g.description.clone())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let triggered = self.temporal.check_prospective(&context);
+
+        for intention in triggered {
+            let salience = (0.4 + intention.priority * 0.5).clamp(0.0, 1.0);
+            let percept = Percept {
+                id: Uuid::new_v4(),
+                percept_type: PerceptType::Temporal,
+                content: format!("Prospective memory: {}", intention.action),
+                salience,
+                valence: Valence::new(0.0),
+                source: "temporal".to_string(),
+                created_at: Utc::now(),
+                metadata: HashMap::new(),
+            };
+            self.perceive(percept);
+
+            if self.config.debug {
+                outputs.push(AgentOutput {
+                    output_type: OutputType::Status,
+                    content: format!("Prospective reminder: {}", intention.action),
+                    target: None,
+                    urgency: salience,
+                    valence: Valence::new(0.0),
+                });
+            }
+
+            self.temporal.prospective.complete(intention.id);
+        }
+    }
+
+    fn record_temporal_goal_events(&mut self, events: &[GoalEvent]) {
+        for event in events {
+            match event {
+                GoalEvent::Completed { goal_id } => {
+                    if let Some(goal) = self.goal_manager.get(*goal_id) {
+                        let moment = TemporalMoment::past(
+                            Utc::now(),
+                            format!("Completed goal: {}", goal.description),
+                        )
+                        .with_valence(0.4)
+                        .with_vividness(0.7)
+                        .with_confidence(0.8)
+                        .with_tag("goal");
+                        self.temporal.time_travel.remember(moment);
+                    }
+                }
+                GoalEvent::Abandoned { goal_id, .. } => {
+                    if let Some(goal) = self.goal_manager.get(*goal_id) {
+                        let moment = TemporalMoment::past(
+                            Utc::now(),
+                            format!("Abandoned goal: {}", goal.description),
+                        )
+                        .with_valence(-0.3)
+                        .with_vividness(0.5)
+                        .with_confidence(0.6)
+                        .with_tag("goal");
+                        self.temporal.time_travel.remember(moment);
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     fn has_similar_goal(&self, description: &str) -> bool {
@@ -1021,6 +1141,18 @@ mod tests {
             agent.world_state().get("time"),
             Some(&"morning".to_string())
         );
+    }
+
+    #[test]
+    fn test_temporal_goal_registration() {
+        let mut agent = AgentLoop::default_agent();
+        let deadline = Utc::now() + chrono::Duration::hours(2);
+        let goal = Goal::new("Finish report").with_deadline(deadline);
+        agent.add_goal(goal);
+
+        let stats = agent.temporal.stats();
+        assert!(stats.active_intentions > 0);
+        assert!(stats.future_moments > 0);
     }
 
     #[test]

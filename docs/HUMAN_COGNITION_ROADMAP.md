@@ -32,13 +32,13 @@ Create a cognitive architecture indistinguishable from human cognition.
 - **Current coverage:** Attention budgeting (`src/core/attention.rs`), thalamic gating, and prefrontal focus provide baseline competition.
 - **Implemented:** Dorsal/ventral salience coordination is active, and mind-wandering now respects recent salience/priority to prevent premature drift.
 
-### 8. Social Cognition ⚠️ (partial)
+### 8. Social Cognition ✅
 - **Current coverage:** Trust/oxytocin signalling, empathic insula responses, and multi-agent messaging support proto-social awareness.
-- **Next focus:** Build explicit theory-of-mind models, social hierarchy tracking, and reputation-weighted decision policies.
+- **Implemented:** Theory-of-mind models update DMN beliefs/narrative, hierarchy signals update traits, and reputation-weighted action scoring biases social decisions.
 
 ### 9. Temporal Cognition ✅
 - **Implemented:** `src/core/temporal.rs` handles duration perception, mental time travel, prospective memory, and temporal discounting.
-- **Next focus:** Close the loop with goal scheduling and episodic simulation for proactive planning.
+- **Implemented:** Goal deadlines now register prospective intentions and future moments; goal outcomes feed episodic memories for proactive planning.
 
 ### 10. Creativity & Imagination ⚠️ (partial)
 - **Current coverage:** `src/core/imagination.rs` recombines memories, generates counterfactuals, and fuels dream content; imagination outputs now feed planning via the `ImaginationPlanner` bridge into goals/actions.

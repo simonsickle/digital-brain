@@ -287,7 +287,7 @@ impl ActionSelector {
         let mut scored_actions: Vec<_> = valid_actions
             .iter()
             .map(|a| {
-                let score = self.score_action(a, neuro_state, active_goals);
+                let score = self.score_action(a, neuro_state, active_goals, current_state);
                 (a, score)
             })
             .collect();
@@ -361,6 +361,7 @@ impl ActionSelector {
         action: &ActionTemplate,
         neuro_state: &NeuromodulatorState,
         active_goals: &[String],
+        current_state: &HashMap<String, String>,
     ) -> f64 {
         // Base value from learning
         let base_value = self.action_values.get(&action.id).copied().unwrap_or(0.0);
@@ -380,13 +381,38 @@ impl ActionSelector {
         // Inhibition from recent actions
         let inhibition = self.inhibition_penalty(action.id);
 
+        // Social reputation bias for tagged actions
+        let social_bias = self.social_reputation_bias(action, current_state);
+
         // Combine factors
-        let score = (base_value + goal_bonus + category_modifier)
+        let score = (base_value + goal_bonus + category_modifier + social_bias)
             - effort_penalty
             - recency_penalty
             - inhibition;
 
         score.max(0.0) // Floor at 0
+    }
+
+    fn social_reputation_bias(
+        &self,
+        action: &ActionTemplate,
+        current_state: &HashMap<String, String>,
+    ) -> f64 {
+        let mut bias = 0.0;
+        for tag in &action.tags {
+            let agent_id = tag
+                .strip_prefix("social:")
+                .or_else(|| tag.strip_prefix("agent:"));
+            if let Some(agent_id) = agent_id {
+                let key = format!("reputation:{}", agent_id);
+                if let Some(value) = current_state.get(&key)
+                    && let Ok(rep) = value.parse::<f64>()
+                {
+                    bias += (rep - 0.5) * 0.2;
+                }
+            }
+        }
+        bias
     }
 
     /// Calculate goal alignment bonus
@@ -682,6 +708,31 @@ mod tests {
                 | ActionDecision::Deliberate { .. }
                 | ActionDecision::Explore { .. }
         ));
+    }
+
+    #[test]
+    fn test_reputation_biases_social_actions() {
+        let mut selector = ActionSelector::new();
+        selector.set_exploration_rate(0.0);
+
+        let mut ally = make_test_action("ally_help", ActionCategory::Social);
+        ally.tags.push("social:ally".to_string());
+        let ally_id = ally.id;
+        let mut foe = make_test_action("foe_help", ActionCategory::Social);
+        foe.tags.push("social:foe".to_string());
+
+        selector.register_action(ally);
+        selector.register_action(foe);
+
+        let state = make_test_neuro_state();
+        let mut current_state = HashMap::new();
+        current_state.insert("reputation:ally".to_string(), "0.9".to_string());
+        current_state.insert("reputation:foe".to_string(), "0.1".to_string());
+
+        let decision = selector.select(&state, &[], &current_state);
+        if let ActionDecision::Execute(id) = decision {
+            assert_eq!(id, ally_id);
+        }
     }
 
     #[test]

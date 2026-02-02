@@ -521,6 +521,18 @@ impl BrainAgent {
     fn sync_neuromodulators_from_brain(&mut self) {
         let state = self.brain.neuromodulators.state();
         self.agent.set_neuromodulators(state);
+        self.sync_social_world_state();
+    }
+
+    fn sync_social_world_state(&mut self) {
+        for (agent_id, _) in self.brain.social_hierarchy() {
+            if let Some(reputation) = self.brain.social_reputation(&agent_id) {
+                self.agent.update_world(
+                    &format!("reputation:{}", agent_id),
+                    &format!("{:.2}", reputation),
+                );
+            }
+        }
     }
 
     /// Get statistics
