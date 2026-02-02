@@ -104,7 +104,7 @@ impl BodyState {
 
     /// Overall arousal level derived from body state
     pub fn arousal(&self) -> f64 {
-        let arousal = (self.heart_rate - 0.5) * 0.3 
+        let arousal = (self.heart_rate - 0.5) * 0.3
             + self.breathing * 0.25
             + self.tension * 0.25
             + (1.0 - self.energy) * 0.1
@@ -114,8 +114,7 @@ impl BodyState {
 
     /// Overall valence derived from body state (somatic marker)
     pub fn valence(&self) -> f64 {
-        let valence = self.gut * 0.4
-            + self.energy * 0.3
+        let valence = self.gut * 0.4 + self.energy * 0.3
             - self.tension * 0.2
             - self.pain * 0.3
             - (self.heart_rate - 1.0).abs() * 0.1;
@@ -254,7 +253,7 @@ impl DisgustResponse {
         body.gut = -0.5 - intensity * 0.3; // Nausea
         body.tension = 0.3 + intensity * 0.2;
         body.breathing = 0.2; // Breath holding
-        
+
         Self {
             disgust_type,
             intensity: intensity.clamp(0.0, 1.0),
@@ -300,7 +299,7 @@ impl EmpathicResponse {
         let mut body = BodyState::new();
         body.tension = 0.3 + intensity * 0.4;
         body.gut = -0.2 * intensity;
-        
+
         Self {
             target: target.into(),
             mirrored_state: "pain".to_string(),
@@ -316,7 +315,7 @@ impl EmpathicResponse {
         body.energy = 0.6 + intensity * 0.3;
         body.gut = 0.2 * intensity;
         body.tension = (0.2 - intensity * 0.1).max(0.0);
-        
+
         Self {
             target: target.into(),
             mirrored_state: "joy".to_string(),
@@ -351,14 +350,14 @@ pub struct RiskAnticipation {
 impl RiskAnticipation {
     pub fn new(situation: impl Into<String>, risk: f64, uncertainty: f64) -> Self {
         let mut body = BodyState::new();
-        
+
         // Risk and uncertainty both trigger arousal
         let arousal_factor = (risk * 0.5 + uncertainty * 0.5).clamp(0.0, 1.0);
         body.heart_rate = 1.0 + arousal_factor * 0.4;
         body.breathing = 0.3 + arousal_factor * 0.4;
         body.tension = 0.2 + arousal_factor * 0.5;
         body.gut = -arousal_factor * 0.4; // Dread
-        
+
         Self {
             situation: situation.into(),
             risk_level: risk.clamp(0.0, 1.0),
@@ -472,7 +471,9 @@ impl Insula {
         };
 
         // Blend toward target based on sensitivity
-        self.body_state = self.body_state.blend(&target, self.config.interoceptive_sensitivity * 0.5);
+        self.body_state = self
+            .body_state
+            .blend(&target, self.config.interoceptive_sensitivity * 0.5);
 
         // Generate subjective feeling
         if let Some(lbl) = label {
@@ -529,7 +530,13 @@ impl Insula {
     }
 
     /// Empathize with another agent's state
-    pub fn empathize(&mut self, target: &str, their_state: &str, their_valence: f64, their_arousal: f64) {
+    pub fn empathize(
+        &mut self,
+        target: &str,
+        their_state: &str,
+        their_valence: f64,
+        their_arousal: f64,
+    ) {
         let resonance = self.config.empathy_strength * their_arousal;
 
         let response = if their_valence > 0.3 {
@@ -541,7 +548,9 @@ impl Insula {
         };
 
         // Mirror their state partially in our body
-        self.body_state = self.body_state.blend(&response.body_effect, resonance * 0.3);
+        self.body_state = self
+            .body_state
+            .blend(&response.body_effect, resonance * 0.3);
 
         // Record empathic response
         self.empathic_responses.push_back(response);
@@ -553,15 +562,16 @@ impl Insula {
     /// Add a subjective feeling
     pub fn add_feeling(&mut self, feeling: SubjectiveFeeling) {
         // Remove weak/old feelings first
-        self.feelings.retain(|f| f.intensity > 0.2 && f.duration() < Duration::minutes(30));
+        self.feelings
+            .retain(|f| f.intensity > 0.2 && f.duration() < Duration::minutes(30));
         self.feelings.push(feeling);
     }
 
     /// Get the dominant current feeling
     pub fn dominant_feeling(&self) -> Option<&SubjectiveFeeling> {
-        self.feelings.iter().max_by(|a, b| {
-            a.intensity.partial_cmp(&b.intensity).unwrap()
-        })
+        self.feelings
+            .iter()
+            .max_by(|a, b| a.intensity.partial_cmp(&b.intensity).unwrap())
     }
 
     /// Get current interoceptive awareness summary
@@ -585,11 +595,15 @@ impl Insula {
             "neutral"
         };
 
-        let feeling_desc = self.dominant_feeling()
+        let feeling_desc = self
+            .dominant_feeling()
             .map(|f| format!(", feeling {}", f.label))
             .unwrap_or_default();
 
-        format!("Body state: {}, {} overall{}", arousal_desc, valence_desc, feeling_desc)
+        format!(
+            "Body state: {}, {} overall{}",
+            arousal_desc, valence_desc, feeling_desc
+        )
     }
 
     /// Update - homeostatic regulation and decay
@@ -601,7 +615,9 @@ impl Insula {
         }
 
         // Gradually return to baseline (homeostasis)
-        self.body_state = self.body_state.blend(&self.baseline, self.config.homeostatic_rate);
+        self.body_state = self
+            .body_state
+            .blend(&self.baseline, self.config.homeostatic_rate);
 
         // Decay feelings
         for feeling in &mut self.feelings {
@@ -610,9 +626,8 @@ impl Insula {
         self.feelings.retain(|f| f.intensity > 0.1);
 
         // Clear old risk anticipations
-        self.risk_anticipations.retain(|r| {
-            r.onset + Duration::hours(1) > Utc::now()
-        });
+        self.risk_anticipations
+            .retain(|r| r.onset + Duration::hours(1) > Utc::now());
     }
 
     /// Get somatic marker for a decision
@@ -622,7 +637,8 @@ impl Insula {
         let choice_lower = choice_description.to_lowercase();
 
         // Check disgust history
-        let disgust_signal: f64 = self.disgust_history
+        let disgust_signal: f64 = self
+            .disgust_history
             .iter()
             .filter(|d| choice_lower.contains(&d.trigger.to_lowercase()))
             .map(|d| -d.intensity)
@@ -630,7 +646,8 @@ impl Insula {
             .clamp(-1.0, 0.0);
 
         // Check risk anticipations
-        let risk_signal: f64 = self.risk_anticipations
+        let risk_signal: f64 = self
+            .risk_anticipations
             .iter()
             .filter(|r| choice_lower.contains(&r.situation.to_lowercase()))
             .map(|r| -r.threat_level())

@@ -79,29 +79,29 @@ pub enum EmotionCategory {
     Anger,
     Surprise,
     Disgust,
-    
+
     // Secondary/complex emotions
     Anticipation,
     Trust,
     Contempt,
-    
+
     // Cognitive emotions
     Interest,
     Confusion,
     Boredom,
-    
+
     // Self-conscious emotions
     Pride,
     Shame,
     Guilt,
     Embarrassment,
-    
+
     // Social emotions
     Love,
     Gratitude,
     Envy,
     Jealousy,
-    
+
     // Blended/neutral
     Neutral,
     Mixed,
@@ -119,7 +119,7 @@ impl EmotionCategory {
             Self::Pride => CoreAffect::new(0.7, 0.6),
             Self::Love => CoreAffect::new(0.9, 0.5),
             Self::Gratitude => CoreAffect::new(0.7, 0.4),
-            
+
             // High arousal, negative valence
             Self::Fear => CoreAffect::new(-0.7, 0.9),
             Self::Anger => CoreAffect::new(-0.6, 0.8),
@@ -127,14 +127,14 @@ impl EmotionCategory {
             Self::Contempt => CoreAffect::new(-0.4, 0.3),
             Self::Envy => CoreAffect::new(-0.5, 0.6),
             Self::Jealousy => CoreAffect::new(-0.6, 0.7),
-            
+
             // Low arousal, negative valence
             Self::Sadness => CoreAffect::new(-0.7, 0.3),
             Self::Shame => CoreAffect::new(-0.6, 0.4),
             Self::Guilt => CoreAffect::new(-0.5, 0.4),
             Self::Embarrassment => CoreAffect::new(-0.4, 0.6),
             Self::Boredom => CoreAffect::new(-0.3, 0.2),
-            
+
             // Neutral/mixed
             Self::Neutral => CoreAffect::new(0.0, 0.3),
             Self::Confusion => CoreAffect::new(-0.2, 0.5),
@@ -174,9 +174,17 @@ impl EmotionCategory {
     /// Classify a core affect into the nearest emotion category
     pub fn from_affect(affect: &CoreAffect) -> Self {
         let categories = [
-            Self::Joy, Self::Sadness, Self::Fear, Self::Anger,
-            Self::Surprise, Self::Disgust, Self::Interest, Self::Boredom,
-            Self::Anticipation, Self::Trust, Self::Neutral,
+            Self::Joy,
+            Self::Sadness,
+            Self::Fear,
+            Self::Anger,
+            Self::Surprise,
+            Self::Disgust,
+            Self::Interest,
+            Self::Boredom,
+            Self::Anticipation,
+            Self::Trust,
+            Self::Neutral,
         ];
 
         let mut closest = Self::Neutral;
@@ -197,21 +205,21 @@ impl EmotionCategory {
 /// Action tendencies - what emotions make us want to do
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionTendency {
-    Approach,   // Move toward
-    Withdraw,   // Move away, disengage
-    Escape,     // Flee, avoid
-    Attack,     // Confront, aggress
-    Attend,     // Focus, orient
-    Reject,     // Push away, expel
-    Explore,    // Investigate, seek novelty
-    Display,    // Show off, broadcast
-    Hide,       // Conceal, become invisible
-    Repair,     // Fix, make amends
-    Connect,    // Bond, affiliate
-    Reciprocate,// Return the favor
-    Acquire,    // Obtain, possess
-    Protect,    // Guard, defend
-    Monitor,    // Watch, wait
+    Approach,    // Move toward
+    Withdraw,    // Move away, disengage
+    Escape,      // Flee, avoid
+    Attack,      // Confront, aggress
+    Attend,      // Focus, orient
+    Reject,      // Push away, expel
+    Explore,     // Investigate, seek novelty
+    Display,     // Show off, broadcast
+    Hide,        // Conceal, become invisible
+    Repair,      // Fix, make amends
+    Connect,     // Bond, affiliate
+    Reciprocate, // Return the favor
+    Acquire,     // Obtain, possess
+    Protect,     // Guard, defend
+    Monitor,     // Watch, wait
 }
 
 /// Appraisal dimensions - how we evaluate events
@@ -345,7 +353,8 @@ impl EmotionalState {
     }
 
     pub fn add_secondary(&mut self, emotion: EmotionCategory, intensity: f64) {
-        self.secondary_emotions.push((emotion, intensity.clamp(0.0, 1.0)));
+        self.secondary_emotions
+            .push((emotion, intensity.clamp(0.0, 1.0)));
     }
 
     /// Duration of current state
@@ -391,7 +400,8 @@ impl Mood {
     /// Update mood based on emotional event
     pub fn process_emotion(&mut self, emotion: &EmotionalState) {
         // Record the emotion
-        self.recent_emotions.push_back((emotion.clone(), Utc::now()));
+        self.recent_emotions
+            .push_back((emotion.clone(), Utc::now()));
         if self.recent_emotions.len() > 20 {
             self.recent_emotions.pop_front();
         }
@@ -515,7 +525,7 @@ impl EmotionSystem {
     pub fn process_event(&mut self, appraisal: &Appraisal, trigger: Option<&str>) {
         // Determine emotion from appraisal
         let emotion_category = appraisal.to_emotion();
-        
+
         // Calculate intensity based on relevance and reactivity
         // Use max of relevance and attention_demand, boosted by the other
         let base_intensity = appraisal.relevance.abs().max(appraisal.attention_demand)
@@ -567,10 +577,8 @@ impl EmotionSystem {
             return None;
         }
 
-        let strategy = RegulationStrategy::for_emotion(
-            self.state.dominant_emotion,
-            self.state.intensity,
-        );
+        let strategy =
+            RegulationStrategy::for_emotion(self.state.dominant_emotion, self.state.intensity);
 
         // Apply regulation based on ability and strategy effectiveness
         let reduction = strategy.effectiveness() * self.regulation_ability * 0.3;
@@ -720,7 +728,7 @@ mod tests {
     #[test]
     fn test_mood_influence() {
         let mut system = EmotionSystem::new();
-        
+
         // Set negative mood
         system.mood.current = CoreAffect::new(-0.5, 0.4);
 

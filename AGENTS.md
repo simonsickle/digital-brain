@@ -1,104 +1,24 @@
-# Digital Brain - Agent Guidelines
+# Repository Guidelines
 
-This document provides essential information for AI coding agents working on the digital-brain project.
+## Project Structure & Module Organization
+Digital Brain core lives under `src/`. `lib.rs` exposes modules, while `brain.rs` handles orchestration. `regions/` groups cognition modules (hippocampus, amygdala, prefrontal, thalamus, dmn); `core/` holds shared systems like the global workspace and prediction engine. Integration tests sit in `tests/`, and runnable demos live in `examples/` (e.g., `memory_demo`, `consciousness_demo`). Persistence is in-memory via rusqlite; no external assets are versioned.
 
-## Project Overview
+## Build, Test, and Development Commands
+- `cargo build` — compile debug artifacts for iterative checks.
+- `cargo build --release` — produce optimized binaries prior to distribution.
+- `cargo test` — run all 67 unit and integration tests; must pass before merges.
+- `cargo clippy --all-targets -- -D warnings` — lint with warnings treated as errors.
+- `cargo fmt --all` / `cargo fmt --all --check` — format code or verify formatting.
+- `cargo run --example <name>` — execute demos such as `memory_demo` or `interconnect_demo`.
 
-Digital Brain is a Rust-based modular simulation of consciousness. It implements computational principles of cognition rather than brute-force neuron simulation.
+## Coding Style & Naming Conventions
+Target Rust 2024 with four-space indentation. Prefer expressive `snake_case` for functions/variables and `CamelCase` for types and enums. Prefix intentionally unused variables with `_`. Collapse nested `if` expressions when clippy recommends it. Encode invariants (e.g., valence ∈ [-1, 1]) via newtypes or validation guards, and annotate intricate flows with brief comments when necessary.
 
-## Tech Stack
+## Testing Guidelines
+Use Rust’s built-in `#[test]` framework. Place tight-scoped tests inside `#[cfg(test)]` modules next to the code; broader behavior goes in `tests/`. Name tests for observable behavior (`handles_low_valence_input`). Favor deterministic inputs, leveraging Tokio test utilities for async contexts. Every behavioral change should ship with at least one new or updated test.
 
-- **Language**: Rust (Edition 2024)
-- **Package Manager**: Cargo
-- **Test Framework**: Built-in Rust test framework (`#[test]`)
-- **Key Dependencies**: tokio (async), serde (serialization), rusqlite (memory persistence), chrono (time)
+## Commit & Pull Request Guidelines
+Write commit subjects in the imperative present (“Add thalamus gating metrics”) and keep them under ~72 characters. Group related changes together, avoiding drive-by refactors within feature commits. Pull requests should summarize the architectural impact, list verification steps (tests, clippy, fmt), and link tracking issues. Attach logs or screenshots when behavior is user-visible.
 
-## Essential Commands
-
-```bash
-# Build
-cargo build
-cargo build --release
-
-# Test (67 tests)
-cargo test
-
-# Lint (warnings as errors in CI)
-cargo clippy --all-targets -- -D warnings
-
-# Format check
-cargo fmt --all --check
-
-# Format fix
-cargo fmt --all
-
-# Run examples
-cargo run --example memory_demo
-cargo run --example consciousness_demo
-cargo run --example interconnect_demo
-cargo run --example live_interconnect
-```
-
-## Project Structure
-
-```
-src/
-├── lib.rs              # Library root, re-exports
-├── brain.rs            # Main Brain orchestrator
-├── signal.rs           # BrainSignal protocol (inter-module communication)
-├── error.rs            # Error types
-├── regions/            # Brain region modules
-│   ├── hippocampus.rs  # Long-term memory (valence-weighted, decay, consolidation)
-│   ├── amygdala.rs     # Emotional processing (threat bias, learned associations)
-│   ├── prefrontal.rs   # Working memory (7±2 capacity, chunking)
-│   ├── thalamus.rs     # Sensory gateway (gating, habituation, routing)
-│   ├── dmn.rs          # Default Mode Network (identity, beliefs, reflection)
-│   └── mod.rs
-└── core/               # Core systems
-    ├── workspace.rs    # Global Workspace (consciousness, salience competition)
-    ├── prediction.rs   # Prediction engine (surprise, dopamine-like learning)
-    └── mod.rs
-
-tests/                  # Integration tests
-examples/               # Runnable demos
-```
-
-## Architecture Principles
-
-1. **Modularity**: Each brain region is independent, communicates via `BrainSignal`
-2. **Type Safety**: Rust's type system encodes invariants (e.g., Valence in [-1,1])
-3. **Signal Protocol**: All modules communicate through `BrainSignal` structs
-
-## Key Types
-
-- `BrainSignal`: Core message type between modules (source, signal_type, content, salience, valence, arousal)
-- `SignalType`: Sensory, Memory, Prediction, Error, Emotion, Attention, Broadcast, Query, Motor
-- `Valence`: Emotional coloring (-1 to +1)
-- `Salience`: Attention-grabbing level (0-1)
-- `Arousal`: Activation level (0-1)
-
-## CI Pipeline
-
-The project uses GitHub Actions with:
-- `cargo check` - Fast compilation check
-- `cargo test` - All unit and integration tests
-- `cargo fmt --check` - Code formatting
-- `cargo clippy -D warnings` - Linting with warnings as errors
-- `cargo build --release` - Release build verification
-
-All checks must pass for PRs and merge queue.
-
-## Code Style
-
-- Run `cargo fmt` before committing
-- Ensure `cargo clippy -- -D warnings` passes
-- Prefix unused variables with `_` (e.g., `_unused_var`)
-- Collapse nested if statements when possible (clippy::collapsible_if)
-- Use `.is_multiple_of()` instead of `% n == 0`
-
-## Testing
-
-- Unit tests are in `#[cfg(test)]` modules within source files
-- Integration tests are in `tests/` directory
-- All tests use in-memory SQLite (no external database needed)
-- Run `cargo test` to execute all 67 tests
+## Architecture Notes
+Maintain module independence by routing communication exclusively through `BrainSignal`. Extending signal types requires updating `SignalType`, `brain.rs`, and affected region handlers. Keep async work non-blocking under Tokio; prefer channels or tasks over thread sleeps to preserve scheduler health.

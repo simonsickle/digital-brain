@@ -191,7 +191,11 @@ impl InnerSpeechSystem {
 
     /// Generate self-instruction
     pub fn instruct(&mut self, instruction: impl Into<String>) -> InnerUtterance {
-        let pronoun = if self.config.use_second_person { "You" } else { "I" };
+        let pronoun = if self.config.use_second_person {
+            "You"
+        } else {
+            "I"
+        };
         let content = format!("{} need to {}", pronoun, instruction.into());
         let utterance = InnerUtterance::new(content, InnerSpeechType::SelfInstruction);
         self.record(utterance.clone());
@@ -210,19 +214,23 @@ impl InnerSpeechSystem {
     pub fn evaluate(&mut self, evaluation: impl Into<String>, positive: bool) -> InnerUtterance {
         let eval = evaluation.into();
         let tone = if positive { 0.5 } else { -0.5 };
-        
+
         // Apply self-criticism bias
         let adjusted_tone = tone + self.config.self_criticism_bias * -0.3;
-        
-        let utterance = InnerUtterance::new(eval, InnerSpeechType::SelfEvaluation)
-            .with_emotion(adjusted_tone);
+
+        let utterance =
+            InnerUtterance::new(eval, InnerSpeechType::SelfEvaluation).with_emotion(adjusted_tone);
         self.record(utterance.clone());
         utterance
     }
 
     /// Generate emotional processing speech
     pub fn process_emotion(&mut self, emotion: &str, intensity: f64) -> InnerUtterance {
-        let pronoun = if self.config.use_second_person { "You" } else { "I" };
+        let pronoun = if self.config.use_second_person {
+            "You"
+        } else {
+            "I"
+        };
         let intensity_word = if intensity > 0.7 {
             "really"
         } else if intensity > 0.4 {
@@ -230,7 +238,7 @@ impl InnerSpeechSystem {
         } else {
             "slightly"
         };
-        
+
         let content = format!("{} {} feel {}", pronoun, intensity_word, emotion);
         let utterance = InnerUtterance::new(content, InnerSpeechType::EmotionalProcessing)
             .with_intensity(intensity);
@@ -242,14 +250,22 @@ impl InnerSpeechSystem {
     pub fn plan(&mut self, steps: &[&str]) -> InnerUtterance {
         let content = if self.config.condensed_mode {
             // Abbreviated: "1. x, 2. y, 3. z"
-            steps.iter().enumerate()
+            steps
+                .iter()
+                .enumerate()
                 .map(|(i, s)| format!("{}. {}", i + 1, s))
                 .collect::<Vec<_>>()
                 .join(", ")
         } else {
             // Full: "First I'll x, then I'll y, finally I'll z"
-            let pronoun = if self.config.use_second_person { "you'll" } else { "I'll" };
-            steps.iter().enumerate()
+            let pronoun = if self.config.use_second_person {
+                "you'll"
+            } else {
+                "I'll"
+            };
+            steps
+                .iter()
+                .enumerate()
                 .map(|(i, s)| {
                     let prefix = match i {
                         0 => "First",
@@ -278,14 +294,11 @@ impl InnerSpeechSystem {
     /// Generate inner dialogue (back and forth)
     pub fn dialogue(&mut self, position: &str, counter: &str) -> Vec<InnerUtterance> {
         let u1 = InnerUtterance::new(position.to_string(), InnerSpeechType::InnerDialogue);
-        let u2 = InnerUtterance::new(
-            format!("But {}", counter),
-            InnerSpeechType::InnerDialogue,
-        );
-        
+        let u2 = InnerUtterance::new(format!("But {}", counter), InnerSpeechType::InnerDialogue);
+
         self.record(u1.clone());
         self.record(u2.clone());
-        
+
         vec![u1, u2]
     }
 
@@ -505,10 +518,7 @@ mod tests {
     #[test]
     fn test_inner_dialogue() {
         let mut speech = InnerSpeechSystem::new();
-        let utterances = speech.dialogue(
-            "I should take a break",
-            "there's still work to do",
-        );
+        let utterances = speech.dialogue("I should take a break", "there's still work to do");
 
         assert_eq!(utterances.len(), 2);
         assert!(utterances[1].content.contains("But"));
