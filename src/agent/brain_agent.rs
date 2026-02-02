@@ -26,7 +26,7 @@ use crate::agent::{
 use crate::brain::{Brain, BrainConfig, ProcessingResult, SleepReport};
 use crate::core::{
     ActionTemplate, CuriositySystem, Domain, Entity, Goal, GoalId, Imagining, PropertyValue,
-    WorldModel,
+    StrategyRegulator, StrategySignal, WorldModel,
 };
 use crate::error::Result;
 
@@ -106,6 +106,10 @@ pub struct BrainAgent {
     multi_agent: Option<MultiAgentSystem>,
     /// Configuration
     config: BrainAgentConfig,
+    /// Strategy regulator (mood/sleep → long-horizon bias)
+    strategy_regulator: StrategyRegulator,
+    /// Last observed sleep quality (0-1)
+    last_sleep_quality: f64,
     /// Statistics
     stats: BrainAgentStats,
     /// Cycles since last sleep
@@ -160,6 +164,8 @@ impl BrainAgent {
             comm,
             multi_agent,
             config,
+            strategy_regulator: StrategyRegulator::default(),
+            last_sleep_quality: 0.5,
             stats: BrainAgentStats::default(),
             cycles_since_sleep: 0,
         })
@@ -368,6 +374,8 @@ impl BrainAgent {
         let processing = None;
         let mut sleep_report = None;
 
+        self.update_strategy_from_state("cycle");
+
         // Sync neuromodulator state from brain to agent
         // (In a full implementation, the brain's neuromodulatory system
         // would be the source of truth)
@@ -410,6 +418,11 @@ impl BrainAgent {
             self.cycles_since_sleep = 0;
         }
 
+        if let Some(report) = &sleep_report {
+            self.last_sleep_quality = report.sleep_quality;
+            self.update_strategy_from_state("sleep");
+        }
+
         BrainAgentCycleResult {
             processing,
             agent_cycle: agent_result,
@@ -427,6 +440,7 @@ impl BrainAgent {
             self.update_world_model_from_processing(input, &result);
         }
         self.stats.total_inputs_processed += 1;
+        self.update_strategy_from_state("perception");
     }
 
     /// Perceive with feedback valence
@@ -455,7 +469,28 @@ impl BrainAgent {
         self.stats.total_sleep_cycles += 1;
         self.stats.total_memories_consolidated += report.memories_consolidated as u64;
         self.cycles_since_sleep = 0;
+        self.last_sleep_quality = report.sleep_quality;
+        self.update_strategy_from_state("sleep");
         Ok(report)
+    }
+
+    fn update_strategy_from_state(&mut self, context: &str) {
+        let state = self.brain.neuromodulators.state();
+        let update = self.strategy_regulator.update(StrategySignal::new(
+            self.last_sleep_quality,
+            state.mood_stability,
+            state.stress,
+        ));
+        self.agent
+            .goals_mut()
+            .apply_strategy_profile(update.profile);
+
+        if let Some(narrative) = update.narrative {
+            self.brain.dmn.narrate(
+                format!("Strategy update ({}): {}", context, narrative.content),
+                narrative.significance,
+            );
+        }
     }
 
     /// Get statistics

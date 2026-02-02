@@ -45,6 +45,7 @@ pub use core::{
     NervousSystemConfig, NervousSystemStats, NeuromodulatorState, NeuromodulatorySystem,
     OxytocinSystem, Pathway, PlanningSuggestion, Prediction, PredictionContext, PredictionEngine,
     PredictionError, PredictionLayer, PredictionState, RewardCategory, RewardQuality, SignalTrace,
+    StrategyNarrative, StrategyProfile, StrategyRegulator, StrategySignal, StrategyUpdate,
     TrustLevel,
 };
 pub use error::{BrainError, Result};
@@ -57,6 +58,7 @@ pub mod prelude {
         ImaginationPlanner, ImaginationPlannerConfig, InhibitionResult, NeuromodulatorState,
         NeuromodulatorySystem, OxytocinSystem, PlanningSuggestion, Prediction, PredictionContext,
         PredictionEngine, PredictionLayer, PredictionState, RewardCategory, RewardQuality,
+        StrategyNarrative, StrategyProfile, StrategyRegulator, StrategySignal, StrategyUpdate,
         TrustLevel,
     };
     pub use crate::error::*;

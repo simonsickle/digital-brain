@@ -22,7 +22,7 @@ Create a cognitive architecture indistinguishable from human cognition.
 - **Next focus:** Couple inner speech with upcoming language cortex modules for grounded verbal reasoning.
 
 ### 5. Sleep & Dreams ⚠️ (iterating)
-- **Current coverage:** `src/core/sleep.rs` orchestrates multi-stage sleep, dream generation via the imagination engine, and exposes `Brain::sleep`.
+- **Current coverage:** `src/core/sleep.rs` orchestrates multi-stage sleep, dream generation via the imagination engine, and exposes `Brain::sleep`; sleep quality now informs DMN narratives and long-horizon strategy biasing.
 - **Next focus:** Tie sleep pressure to hypothalamic drives, log dream insights, and trigger schema updates post-REM.
 
 ### 6. Predictive Processing ⚠️ (partial)
@@ -67,7 +67,7 @@ Create a cognitive architecture indistinguishable from human cognition.
 ### Phase D: Predictive & Generative Mastery
 10. ✅ Layer hierarchical predictive coding and active inference into perception/action loops (prediction context synthesis + active inference proposals).
 11. ✅ Integrate imagination outputs with planning and goal management for creative problem solving.
-12. Instrument mood and sleep data to adapt long-horizon strategies and self-narratives.
+12. ✅ Instrument mood and sleep data to adapt long-horizon strategies and self-narratives.
 
 ---
 

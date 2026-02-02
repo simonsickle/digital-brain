@@ -652,10 +652,33 @@ impl Brain {
         // Cortisol restoration during sleep (critical for recovery)
         self.neuromodulators.cortisol.rest();
 
+        let hours_factor = (hours / 8.0).clamp(0.0, 1.0);
+        let consolidation_factor =
+            (consolidated_count as f64 / unconsolidated.len().max(1) as f64).min(1.0);
+        let sleep_quality = (hours_factor * 0.7 + consolidation_factor * 0.3).clamp(0.0, 1.0);
+
+        let mood_stability = self.neuromodulators.state().mood_stability;
+        let narrative_note = if sleep_quality < 0.4 {
+            "Rest felt insufficient; prioritize recovery"
+        } else if mood_stability > 0.7 && sleep_quality > 0.6 {
+            "Rested and stable; long-horizon planning feels viable"
+        } else {
+            "Moderate rest; maintain balanced pacing"
+        };
+
+        self.dmn.narrate(
+            format!(
+                "Sleep summary: {:.1}h, {} memories consolidated, quality {:.2}. {}",
+                hours, consolidated_count, sleep_quality, narrative_note
+            ),
+            (0.3 + sleep_quality * 0.4).clamp(0.2, 1.0),
+        );
+
         Ok(SleepReport {
             hours_slept: hours,
             memories_forgotten: forgotten,
             memories_consolidated: consolidated_count,
+            sleep_quality,
             reflection: reflection.content,
         })
     }
@@ -1911,6 +1934,7 @@ pub struct SleepReport {
     pub hours_slept: f64,
     pub memories_forgotten: usize,
     pub memories_consolidated: usize,
+    pub sleep_quality: f64,
     pub reflection: String,
 }
 

@@ -21,6 +21,7 @@ pub mod sensory;
 pub mod sleep;
 pub mod social;
 pub mod stimulus;
+pub mod strategy;
 pub mod temporal;
 pub mod workspace;
 pub mod world_model;
@@ -96,6 +97,9 @@ pub use social::{SocialAgentProfile, SocialCognition, SocialUpdate, TheoryOfMind
 pub use stimulus::{
     DriveEvent, FileEvent, GoalEvent as StimulusGoalEvent, Stimulus, StimulusKind,
     StimulusPriority, StimulusResponse, StimulusSource, SystemEvent, TimeEvent,
+};
+pub use strategy::{
+    StrategyNarrative, StrategyProfile, StrategyRegulator, StrategySignal, StrategyUpdate,
 };
 pub use temporal::{
     DurationPerception, Intention, IntentionId, MentalTimeTravel, ProspectiveMemory,

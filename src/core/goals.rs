@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::core::neuromodulators::NeuromodulatorState;
+use crate::core::strategy::StrategyProfile;
 
 /// Unique identifier for a goal
 pub type GoalId = Uuid;
@@ -353,6 +354,8 @@ pub struct GoalManager {
     max_events: usize,
     /// Statistics
     stats: GoalStats,
+    /// Current strategic bias (long-horizon vs recovery)
+    strategy_profile: StrategyProfile,
 }
 
 impl Default for GoalManager {
@@ -370,6 +373,7 @@ impl GoalManager {
             events: Vec::new(),
             max_events: 100,
             stats: GoalStats::default(),
+            strategy_profile: StrategyProfile::default(),
         }
     }
 
@@ -458,7 +462,20 @@ impl GoalManager {
             .map(|parent| parent.priority.as_f64() * 0.1)
             .unwrap_or(0.0);
 
-        base_score + motivation_bonus + momentum + subgoal_bonus - stress_penalty
+        let horizon_bias = match goal.time_horizon {
+            TimeHorizon::Immediate => -0.2,
+            TimeHorizon::ShortTerm => -0.1,
+            TimeHorizon::MediumTerm => 0.1,
+            TimeHorizon::LongTerm => 0.2,
+        };
+        let long_horizon_adjust = horizon_bias * self.strategy_profile.long_horizon_bias;
+
+        let recovery_penalty =
+            self.strategy_profile.recovery_priority * goal.estimated_effort * 0.3;
+
+        base_score + motivation_bonus + momentum + subgoal_bonus + long_horizon_adjust
+            - stress_penalty
+            - recovery_penalty
     }
 
     /// Check if a goal should be deferred based on patience
@@ -477,7 +494,24 @@ impl GoalManager {
             return true;
         }
 
+        // Recovery priority defers long-horizon, high-effort goals
+        if self.strategy_profile.recovery_priority > 0.6
+            && (goal.time_horizon == TimeHorizon::LongTerm || goal.estimated_effort > 0.6)
+        {
+            return true;
+        }
+
         false
+    }
+
+    /// Apply a new strategy profile for goal scoring.
+    pub fn apply_strategy_profile(&mut self, profile: StrategyProfile) {
+        self.strategy_profile = profile;
+    }
+
+    /// Get current strategy profile.
+    pub fn strategy_profile(&self) -> &StrategyProfile {
+        &self.strategy_profile
     }
 
     /// Decompose a goal into subgoals
@@ -996,6 +1030,34 @@ mod tests {
 
         let active = manager.get_active_goal(&state).unwrap();
         assert_eq!(active.id, high_id);
+    }
+
+    #[test]
+    fn test_strategy_profile_biases_long_horizon() {
+        let mut manager = GoalManager::new();
+        let mut state = make_test_state();
+        state.patience = 0.9;
+
+        let long = Goal::new("Long horizon goal")
+            .with_priority(Priority::Medium)
+            .with_horizon(TimeHorizon::LongTerm);
+        let short = Goal::new("Immediate goal")
+            .with_priority(Priority::Medium)
+            .with_horizon(TimeHorizon::Immediate);
+
+        let long_id = manager.add(long);
+        manager.add(short);
+
+        manager.apply_strategy_profile(StrategyProfile {
+            long_horizon_bias: 0.8,
+            recovery_priority: 0.0,
+            sleep_quality: 0.8,
+            mood_stability: 0.8,
+            stress: 0.1,
+        });
+
+        let active = manager.get_active_goal(&state).unwrap();
+        assert_eq!(active.id, long_id);
     }
 
     #[test]
