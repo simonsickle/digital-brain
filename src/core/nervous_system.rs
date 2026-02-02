@@ -49,6 +49,7 @@ pub enum BrainRegion {
     SomatosensoryCortex,
     GustatoryCortex,
     OlfactoryCortex,
+    PosteriorParietal,
     Prefrontal,
     DMN,
     Workspace,
@@ -71,6 +72,7 @@ impl BrainRegion {
             BrainRegion::SomatosensoryCortex => "SomatosensoryCortex",
             BrainRegion::GustatoryCortex => "GustatoryCortex",
             BrainRegion::OlfactoryCortex => "OlfactoryCortex",
+            BrainRegion::PosteriorParietal => "PosteriorParietal",
             BrainRegion::Prefrontal => "Prefrontal",
             BrainRegion::DMN => "DMN",
             BrainRegion::Workspace => "Workspace",
@@ -265,6 +267,13 @@ impl NervousSystem {
             0.7,
         ));
 
+        // Thalamus → Posterior Parietal (multimodal integration gateway)
+        self.add_pathway(Pathway::new(
+            BrainRegion::Thalamus,
+            BrainRegion::PosteriorParietal,
+            0.75,
+        ));
+
         // Thalamus → Prefrontal (sensory to working memory)
         self.add_pathway(Pathway::new(
             BrainRegion::Thalamus,
@@ -316,7 +325,29 @@ impl NervousSystem {
                 Pathway::new(region, BrainRegion::DMN, 0.6)
                     .with_signal_types(vec![SignalType::Sensory, SignalType::Broadcast]),
             );
+            self.add_pathway(
+                Pathway::new(region, BrainRegion::PosteriorParietal, 0.85)
+                    .with_signal_types(vec![SignalType::Sensory, SignalType::Attention]),
+            );
         }
+
+        // Posterior Parietal → Workspace/Prefrontal/Hippocampus (bound context)
+        self.add_pathway(
+            Pathway::new(BrainRegion::PosteriorParietal, BrainRegion::Workspace, 0.9)
+                .with_signal_types(vec![SignalType::Sensory, SignalType::Attention]),
+        );
+        self.add_pathway(
+            Pathway::new(BrainRegion::PosteriorParietal, BrainRegion::Prefrontal, 0.8)
+                .with_signal_types(vec![SignalType::Sensory, SignalType::Attention]),
+        );
+        self.add_pathway(
+            Pathway::new(
+                BrainRegion::PosteriorParietal,
+                BrainRegion::Hippocampus,
+                0.7,
+            )
+            .with_signal_types(vec![SignalType::Sensory, SignalType::Memory]),
+        );
 
         // Hippocampus ↔ Prefrontal (memory and working memory integration)
         self.add_pathway(
@@ -343,6 +374,7 @@ impl NervousSystem {
             BrainRegion::Prefrontal,
             BrainRegion::DMN,
             BrainRegion::PredictionEngine,
+            BrainRegion::PosteriorParietal,
         ] {
             self.add_pathway(
                 Pathway::new(BrainRegion::Workspace, region, 1.0)
@@ -384,6 +416,7 @@ impl NervousSystem {
             BrainRegion::SomatosensoryCortex,
             BrainRegion::GustatoryCortex,
             BrainRegion::OlfactoryCortex,
+            BrainRegion::PosteriorParietal,
             BrainRegion::Prefrontal,
             BrainRegion::DMN,
             BrainRegion::Workspace,

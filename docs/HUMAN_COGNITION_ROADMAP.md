@@ -51,7 +51,7 @@ Create a cognitive architecture indistinguishable from human cognition.
 
 ### Phase A: Sensory Foundations
 1. ✅ Build cortical sensory modules (visual, auditory, somatosensory, gustatory, olfactory) downstream of the thalamus (`src/regions/sensory_cortex.rs` + thalamus/nervous system integration).
-2. Add posterior parietal integration to bind multimodal context before workspace broadcast.
+2. ✅ Add posterior parietal integration to bind multimodal context before workspace broadcast (`src/regions/posterior_parietal.rs` + brain/thalamus/nervous system integration).
 3. Connect sensory abstractions to schema and world-model stores for richer grounding.
 
 ### Phase B: Motor & Autonomic Control

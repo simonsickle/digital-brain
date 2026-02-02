@@ -81,6 +81,8 @@ pub enum Destination {
     GustatoryCortex,
     /// Send to olfactory cortex for feature extraction
     OlfactoryCortex,
+    /// Send to posterior parietal cortex for multimodal binding
+    PosteriorParietal,
     /// Send to prefrontal for working memory
     Prefrontal,
     /// Send to global workspace for broadcast
@@ -258,6 +260,7 @@ impl Thalamus {
         match signal.signal_type {
             SignalType::Sensory => {
                 destinations.push(Destination::Amygdala); // Emotional tagging first
+                destinations.push(Destination::PosteriorParietal); // Bind multimodal context
                 if signal.salience.is_high() {
                     destinations.push(Destination::Workspace);
                 }
@@ -604,6 +607,11 @@ mod tests {
         let sensory = BrainSignal::new("test", SignalType::Sensory, "input").with_salience(0.5);
         let routed = thalamus.route(&sensory);
         assert!(routed.destinations.contains(&Destination::Amygdala));
+        assert!(
+            routed
+                .destinations
+                .contains(&Destination::PosteriorParietal)
+        );
 
         // Surprising error should go to workspace and hippocampus
         let error = BrainSignal::new("test", SignalType::Error, "surprise!")

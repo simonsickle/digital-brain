@@ -21,6 +21,7 @@ use crate::regions::dmn::{
     Belief, BeliefCategory, DefaultModeNetwork, Identity, ReflectionTrigger,
 };
 use crate::regions::hippocampus::HippocampusStore;
+use crate::regions::posterior_parietal::{MultimodalContext, PosteriorParietalCortex};
 use crate::regions::prefrontal::{PrefrontalConfig, PrefrontalCortex};
 use crate::regions::schema::{Schema, SchemaCategory, SchemaStats, SchemaStore};
 use crate::regions::sensory_cortex::{
@@ -74,6 +75,8 @@ pub struct ProcessingResult {
     pub reflections: Vec<String>,
     /// Cortical feature maps derived from sensory processing
     pub cortical_features: Vec<CorticalRepresentation>,
+    /// Multimodal context derived from posterior parietal binding
+    pub multimodal_context: Option<MultimodalContext>,
 }
 
 /// The complete digital brain.
@@ -102,6 +105,8 @@ pub struct Brain {
     pub gustatory_cortex: GustatoryCortex,
     /// Olfactory feature extraction
     pub olfactory_cortex: OlfactoryCortex,
+    /// Multimodal context integration
+    pub posterior_parietal: PosteriorParietalCortex,
     /// Neuromodulatory system (dopamine, serotonin, norepinephrine, acetylcholine)
     pub neuromodulators: NeuromodulatorySystem,
     /// Nervous system (inter-module signal routing)
@@ -161,6 +166,7 @@ impl Brain {
             somatosensory_cortex: SomatosensoryCortex::new(),
             gustatory_cortex: GustatoryCortex::new(),
             olfactory_cortex: OlfactoryCortex::new(),
+            posterior_parietal: PosteriorParietalCortex::new(),
             neuromodulators: NeuromodulatorySystem::new(),
             nervous_system: NervousSystem::new(),
             schemas: SchemaStore::new(),
@@ -217,6 +223,7 @@ impl Brain {
                 errors: Vec::new(),
                 reflections: Vec::new(),
                 cortical_features: Vec::new(),
+                multimodal_context: None,
             });
         }
 
@@ -225,6 +232,29 @@ impl Brain {
 
         let cortical_features =
             self.process_sensory_cascade(&mut sensory_signal, &routed.destinations);
+
+        let multimodal_context = if routed
+            .destinations
+            .iter()
+            .any(|d| matches!(d, Destination::PosteriorParietal))
+        {
+            let context = self.posterior_parietal.integrate(&cortical_features);
+            if let Some(ref context) = context {
+                if let Ok(value) = serde_json::to_value(context) {
+                    sensory_signal
+                        .metadata
+                        .insert("multimodal_context".to_string(), value);
+                }
+                self.nervous_system.transmit(
+                    BrainRegion::Thalamus,
+                    BrainRegion::PosteriorParietal,
+                    sensory_signal.clone(),
+                );
+            }
+            context
+        } else {
+            None
+        };
 
         // 3. Emotional tagging by amygdala
         // Record signal flowing to amygdala via nervous system
@@ -271,17 +301,50 @@ impl Brain {
                 | Destination::AuditoryCortex
                 | Destination::SomatosensoryCortex
                 | Destination::GustatoryCortex
-                | Destination::OlfactoryCortex => {
+                | Destination::OlfactoryCortex
+                | Destination::PosteriorParietal => {
                     // Already handled in sensory cascade; nothing else to do here.
                 }
                 Destination::Workspace => {
+                    let workspace_signal = if let Some(context) = &multimodal_context {
+                        let mut integrated = BrainSignal::new(
+                            "posterior_parietal",
+                            SignalType::Sensory,
+                            context.clone(),
+                        )
+                        .with_salience(
+                            (tagged_signal.salience.value() + context.binding_strength * 0.2)
+                                .clamp(0.0, 1.0),
+                        )
+                        .with_valence(tagged_signal.valence.value())
+                        .with_arousal(tagged_signal.arousal.value());
+                        integrated.confidence = context.confidence;
+                        integrated.metadata.insert(
+                            "source_content".to_string(),
+                            serde_json::Value::String(content.clone()),
+                        );
+                        integrated.metadata.insert(
+                            "multimodal_context".to_string(),
+                            serde_json::to_value(context).unwrap_or(serde_json::Value::Null),
+                        );
+                        integrated
+                    } else {
+                        tagged_signal.clone()
+                    };
+
                     // Track signal to workspace via nervous system
+                    let from_region = if multimodal_context.is_some() {
+                        BrainRegion::PosteriorParietal
+                    } else {
+                        BrainRegion::Amygdala
+                    };
+                    let submit_signal = workspace_signal.clone();
                     self.nervous_system.transmit(
-                        BrainRegion::Amygdala,
+                        from_region,
                         BrainRegion::Workspace,
-                        tagged_signal.clone(),
+                        workspace_signal,
                     );
-                    self.workspace.submit(tagged_signal.clone());
+                    self.workspace.submit(submit_signal);
                 }
                 Destination::Hippocampus => {
                     // Track signal to hippocampus
@@ -389,6 +452,7 @@ impl Brain {
             errors: Vec::new(),
             reflections,
             cortical_features,
+            multimodal_context,
         })
     }
 

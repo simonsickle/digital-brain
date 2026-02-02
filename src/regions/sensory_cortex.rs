@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashSet, VecDeque};
 
 /// Supported sensory modalities.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SensoryModality {
     Visual,
     Auditory,

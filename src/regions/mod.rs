@@ -15,6 +15,7 @@
 //! - **insula**: Interoception, body awareness, empathy, disgust
 //! - **hypothalamus**: Drives, homeostasis, circadian rhythms, stress response
 //! - **sensory_cortex**: Modality-specific feature extraction downstream of thalamus
+//! - **posterior_parietal**: Multimodal binding and context integration
 
 pub mod acc;
 pub mod amygdala;
@@ -24,6 +25,7 @@ pub mod dmn;
 pub mod hippocampus;
 pub mod hypothalamus;
 pub mod insula;
+pub mod posterior_parietal;
 pub mod prefrontal;
 pub mod schema;
 pub mod sensory_cortex;
@@ -42,6 +44,7 @@ pub use insula::{
     BodyState, DisgustResponse, DisgustType, EmpathicResponse, Insula, InsulaConfig, InsulaStats,
     RiskAnticipation, SubjectiveFeeling,
 };
+pub use posterior_parietal::{MultimodalContext, PosteriorParietalCortex};
 pub use sensory_cortex::{
     AuditoryCortex, CorticalRepresentation, GustatoryCortex, OlfactoryCortex, SensoryModality,
     SomatosensoryCortex, VisualCortex,
