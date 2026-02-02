@@ -293,12 +293,15 @@ impl Brain {
         let mut tagged_signal = self.amygdala.tag_signal(sensory_signal.clone());
         let emotion = self.amygdala.appraise(&tagged_signal);
 
+        let nm_state = self.neuromodulators.state();
         let salience_outcome = self.salience_network.update(
             &tagged_signal,
             SalienceInputs {
                 cognitive_load: self.acc.cognitive_load(),
                 interoceptive_alert: self.insula.body_state.is_alert(),
                 stress_level: self.hypothalamus.stress.level(),
+                mood_stability: nm_state.mood_stability,
+                social_affinity: nm_state.oxytocin,
             },
         );
 

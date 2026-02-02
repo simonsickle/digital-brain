@@ -13,6 +13,8 @@ pub struct SalienceInputs {
     pub cognitive_load: f64,
     pub interoceptive_alert: bool,
     pub stress_level: f64,
+    pub mood_stability: f64,
+    pub social_affinity: f64,
 }
 
 /// Output of the salience network.
@@ -74,10 +76,18 @@ impl SalienceNetwork {
     }
 
     pub fn update(&mut self, signal: &BrainSignal, inputs: SalienceInputs) -> SalienceOutcome {
-        let dorsal_weight = self.dorsal.weight(signal, inputs.cognitive_load);
-        let ventral_weight =
+        let mut dorsal_weight = self.dorsal.weight(signal, inputs.cognitive_load);
+        let mut ventral_weight =
             self.ventral
                 .weight(signal, inputs.interoceptive_alert, inputs.stress_level);
+
+        dorsal_weight =
+            (dorsal_weight + inputs.mood_stability * 0.1 + inputs.social_affinity * 0.1)
+                .clamp(0.0, 1.0);
+        ventral_weight = (ventral_weight
+            + (1.0 - inputs.mood_stability) * 0.1
+            + (1.0 - inputs.social_affinity) * 0.05)
+            .clamp(0.0, 1.0);
 
         let balance = ventral_weight - dorsal_weight;
         let salience_boost = (balance * 0.2).clamp(-0.1, 0.2);
@@ -149,6 +159,8 @@ mod tests {
                 cognitive_load: 0.2,
                 interoceptive_alert: true,
                 stress_level: 0.3,
+                mood_stability: 0.2,
+                social_affinity: 0.3,
             },
         );
 
@@ -172,6 +184,8 @@ mod tests {
                 cognitive_load: 0.6,
                 interoceptive_alert: false,
                 stress_level: 0.1,
+                mood_stability: 0.8,
+                social_affinity: 0.7,
             },
         );
 
