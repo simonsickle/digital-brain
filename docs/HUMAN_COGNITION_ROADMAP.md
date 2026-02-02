@@ -55,7 +55,7 @@ Create a cognitive architecture indistinguishable from human cognition.
 3. ✅ Connect sensory abstractions to schema and world-model stores for richer grounding.
 
 ### Phase B: Motor & Autonomic Control
-4. Implement motor cortex layers that translate basal ganglia output into structured actions.
+4. ✅ Implement motor cortex layers that translate basal ganglia output into structured actions.
 5. Extend cerebellar forward models and motor imagery, closing loops with the imagination engine.
 6. Simulate brainstem autonomic centres to give hypothalamus/insula real-time feedback.
 

@@ -50,6 +50,7 @@ pub enum BrainRegion {
     GustatoryCortex,
     OlfactoryCortex,
     PosteriorParietal,
+    MotorCortex,
     Prefrontal,
     DMN,
     Workspace,
@@ -73,6 +74,7 @@ impl BrainRegion {
             BrainRegion::GustatoryCortex => "GustatoryCortex",
             BrainRegion::OlfactoryCortex => "OlfactoryCortex",
             BrainRegion::PosteriorParietal => "PosteriorParietal",
+            BrainRegion::MotorCortex => "MotorCortex",
             BrainRegion::Prefrontal => "Prefrontal",
             BrainRegion::DMN => "DMN",
             BrainRegion::Workspace => "Workspace",
@@ -281,6 +283,24 @@ impl NervousSystem {
             0.8,
         ));
 
+        // Basal Ganglia → Motor Cortex (action selection to motor planning)
+        self.add_pathway(
+            Pathway::new(BrainRegion::BasalGanglia, BrainRegion::MotorCortex, 0.9)
+                .with_signal_types(vec![SignalType::Motor]),
+        );
+
+        // Motor Cortex → External (motor output)
+        self.add_pathway(
+            Pathway::new(BrainRegion::MotorCortex, BrainRegion::External, 0.9)
+                .with_signal_types(vec![SignalType::Motor]),
+        );
+
+        // Motor Cortex → Cerebellum (timing/prediction)
+        self.add_pathway(
+            Pathway::new(BrainRegion::MotorCortex, BrainRegion::Cerebellum, 0.7)
+                .with_signal_types(vec![SignalType::Motor]),
+        );
+
         // Thalamus → Hippocampus (sensory to memory encoding)
         self.add_pathway(Pathway::new(
             BrainRegion::Thalamus,
@@ -375,6 +395,7 @@ impl NervousSystem {
             BrainRegion::DMN,
             BrainRegion::PredictionEngine,
             BrainRegion::PosteriorParietal,
+            BrainRegion::MotorCortex,
         ] {
             self.add_pathway(
                 Pathway::new(BrainRegion::Workspace, region, 1.0)
@@ -417,6 +438,7 @@ impl NervousSystem {
             BrainRegion::GustatoryCortex,
             BrainRegion::OlfactoryCortex,
             BrainRegion::PosteriorParietal,
+            BrainRegion::MotorCortex,
             BrainRegion::Prefrontal,
             BrainRegion::DMN,
             BrainRegion::Workspace,

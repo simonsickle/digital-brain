@@ -21,6 +21,7 @@ use crate::regions::dmn::{
     Belief, BeliefCategory, DefaultModeNetwork, Identity, ReflectionTrigger,
 };
 use crate::regions::hippocampus::HippocampusStore;
+use crate::regions::motor_cortex::{MotorCommand, MotorCortex};
 use crate::regions::posterior_parietal::{MultimodalContext, PosteriorParietalCortex};
 use crate::regions::prefrontal::{PrefrontalConfig, PrefrontalCortex};
 use crate::regions::schema::{Schema, SchemaCategory, SchemaStats, SchemaStore};
@@ -107,6 +108,8 @@ pub struct Brain {
     pub olfactory_cortex: OlfactoryCortex,
     /// Multimodal context integration
     pub posterior_parietal: PosteriorParietalCortex,
+    /// Motor planning and sequencing
+    pub motor_cortex: MotorCortex,
     /// Neuromodulatory system (dopamine, serotonin, norepinephrine, acetylcholine)
     pub neuromodulators: NeuromodulatorySystem,
     /// Nervous system (inter-module signal routing)
@@ -167,6 +170,7 @@ impl Brain {
             gustatory_cortex: GustatoryCortex::new(),
             olfactory_cortex: OlfactoryCortex::new(),
             posterior_parietal: PosteriorParietalCortex::new(),
+            motor_cortex: MotorCortex::new(),
             neuromodulators: NeuromodulatorySystem::new(),
             nervous_system: NervousSystem::new(),
             schemas: SchemaStore::new(),
@@ -1218,6 +1222,16 @@ impl Brain {
 
     /// Select an action based on current context
     pub fn select_action(&mut self, context: &str) -> Option<uuid::Uuid> {
+        self.select_action_command(context)
+            .map(|command| command.action_id)
+    }
+
+    /// Select an action and prepare a motor command.
+    pub fn select_action_command(&mut self, context: &str) -> Option<MotorCommand> {
+        // Sync dopamine from neuromodulators
+        self.basal_ganglia
+            .set_dopamine(self.neuromodulators.state().dopamine);
+
         let result = self.basal_ganglia.select(context);
 
         // If there's conflict, register it with ACC
@@ -1228,11 +1242,29 @@ impl Brain {
             );
         }
 
-        // Sync dopamine from neuromodulators
-        self.basal_ganglia
-            .set_dopamine(self.neuromodulators.state().dopamine);
+        let action_id = result.selected?;
+        let action = self.basal_ganglia.get_action(action_id)?;
+        let command =
+            self.motor_cortex
+                .prepare_command(action, context, result.confidence, result.habitual);
 
-        result.selected
+        let salience = (result.confidence * 0.7 + action.automaticity * 0.3).clamp(0.0, 1.0);
+        let motor_signal = BrainSignal::new("motor_cortex", SignalType::Motor, command.clone())
+            .with_salience(salience)
+            .with_priority(if result.habitual { 1 } else { 0 });
+
+        self.nervous_system.transmit(
+            BrainRegion::BasalGanglia,
+            BrainRegion::MotorCortex,
+            motor_signal.clone(),
+        );
+        self.nervous_system.transmit(
+            BrainRegion::MotorCortex,
+            BrainRegion::External,
+            motor_signal,
+        );
+
+        Some(command)
     }
 
     /// Provide reward for the last selected action
@@ -1787,6 +1819,22 @@ mod tests {
         // Verify identity was set
         let who = brain.who_am_i();
         assert!(who.contains("Rata"));
+    }
+
+    #[test]
+    fn test_motor_command_from_selection() {
+        let mut brain = Brain::new().unwrap();
+        let mut action = ActionPattern::new("wave").with_context("greet");
+        let action_id = action.id;
+        action.sub_actions = vec!["raise hand".to_string(), "wave".to_string()];
+        brain.register_action(action);
+
+        let command = brain
+            .select_action_command("greet the visitor")
+            .expect("motor command should be prepared");
+
+        assert_eq!(command.action_id, action_id);
+        assert_eq!(command.steps.len(), 2);
     }
 
     #[test]
