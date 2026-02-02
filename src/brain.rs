@@ -1691,7 +1691,15 @@ impl Brain {
         self.neuromodulators.record_positive_interaction(entity);
         // Also record in DMN's agent model
         self.dmn.get_agent_model(entity).record_interaction(true);
-        self.social_cognition.observe_interaction(entity, true, 0.7);
+        let update = self.social_cognition.observe_interaction(entity, true, 0.7);
+        self.sync_social_profile(entity);
+        self.dmn.narrate(
+            format!(
+                "Positive interaction with {} (reputation {:.2})",
+                entity, update.new_reputation
+            ),
+            0.4,
+        );
     }
 
     /// Record a negative interaction (betrayal, reduces trust)
@@ -1699,8 +1707,17 @@ impl Brain {
         self.neuromodulators.record_negative_interaction(entity);
         // Also record in DMN's agent model
         self.dmn.get_agent_model(entity).record_interaction(false);
-        self.social_cognition
+        let update = self
+            .social_cognition
             .observe_interaction(entity, false, 0.7);
+        self.sync_social_profile(entity);
+        self.dmn.narrate(
+            format!(
+                "Negative interaction with {} (reputation {:.2})",
+                entity, update.new_reputation
+            ),
+            0.5,
+        );
     }
 
     /// Get trust level for an entity (0-1)
@@ -1725,7 +1742,9 @@ impl Brain {
 
     /// Infer another agent's likely intent/emotion from a cue.
     pub fn infer_social_state(&mut self, agent_id: &str, cue: &str) -> TheoryOfMindState {
-        self.social_cognition.infer_theory_of_mind(agent_id, cue)
+        let inference = self.social_cognition.infer_theory_of_mind(agent_id, cue);
+        self.update_social_model_from_inference(&inference);
+        inference
     }
 
     /// Get current reputation estimate for an agent.
@@ -1736,6 +1755,47 @@ impl Brain {
     /// Get current social hierarchy ranking.
     pub fn social_hierarchy(&self) -> Vec<(String, f64)> {
         self.social_cognition.hierarchy()
+    }
+
+    fn sync_social_profile(&mut self, agent_id: &str) {
+        if let Some(profile) = self.social_cognition.profile_snapshot(agent_id) {
+            let model = self.dmn.get_agent_model(agent_id);
+            model.set_trait("warmth", profile.warmth);
+            model.set_trait("competence", profile.competence);
+            model.set_trait("dominance", profile.dominance);
+            model.set_trait("reputation", profile.reputation);
+            model.trust_level =
+                (model.trust_level * 0.7 + profile.reputation * 0.3).clamp(0.0, 1.0);
+        }
+    }
+
+    fn update_social_model_from_inference(&mut self, inference: &TheoryOfMindState) {
+        let model = self.dmn.get_agent_model(&inference.agent_id);
+        model.set_trait(
+            format!("intent:{}", inference.inferred_intent),
+            inference.confidence,
+        );
+        model.set_trait(
+            format!("emotion:{}", inference.inferred_emotion),
+            inference.confidence,
+        );
+
+        let belief_content = format!(
+            "{} tends to be {}",
+            inference.agent_id, inference.inferred_intent
+        );
+        self.dmn.add_belief(Belief::new(
+            belief_content,
+            inference.confidence,
+            BeliefCategory::OtherModel,
+        ));
+        self.dmn.narrate(
+            format!(
+                "Inferred {} is {} ({})",
+                inference.agent_id, inference.inferred_intent, inference.inferred_emotion
+            ),
+            (0.4 + inference.confidence * 0.4).clamp(0.0, 1.0),
+        );
     }
 
     /// Check if the brain advises patience (waiting for better outcome).
@@ -2651,6 +2711,18 @@ mod tests {
         let inference = brain.infer_social_state("ally", "Can you help me?");
         assert_eq!(inference.inferred_intent, "cooperative");
         assert!(brain.social_reputation("ally").unwrap_or(0.0) > 0.5);
+    }
+
+    #[test]
+    fn test_social_inference_updates_dmn_model() {
+        let mut brain = Brain::new().unwrap();
+        let _ = brain.infer_social_state("neighbor", "Can you help me?");
+
+        let beliefs = brain.dmn.beliefs_in_category(BeliefCategory::OtherModel);
+        assert!(!beliefs.is_empty());
+
+        let model = brain.dmn.get_agent_model("neighbor");
+        assert!(model.traits.contains_key("intent:cooperative"));
     }
 
     #[test]

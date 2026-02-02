@@ -13,9 +13,9 @@ Create a cognitive architecture indistinguishable from human cognition.
 - **Current coverage:** Discrete emotion appraisal lives in `src/core/emotion.rs` and the amygdala (`src/regions/amygdala.rs`), backed by neuromodulators for valence/arousal.
 - **Implemented:** Mood baselines now drift persistently, regulation strategies shape neuromodulator responses, and emotion trajectories are wired into decision-relevant neuromodulator state and saved/loaded with the brain.
 
-### 3. Self-Model & Metacognition ⚠️ (iterating)
+### 3. Self-Model & Metacognition ✅
 - **Current coverage:** The DMN (`src/regions/dmn.rs`) and self-model (`src/core/self_model.rs`) maintain identity, beliefs, and metacognitive traces.
-- **Next focus:** Expand theory-of-mind reasoning, narrative coherence, and integration with social cognition signals.
+- **Implemented:** Social cognition updates now sync into DMN agent models, theory-of-mind inference updates beliefs/narrative, and social profiles influence intent/confidence reasoning.
 
 ### 4. Inner Speech & Narrative ✅
 - **Current coverage:** `src/core/inner_speech.rs` generates self-talk, rehearsal, and narrative buffers that synchronize with the DMN.

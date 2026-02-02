@@ -36,6 +36,10 @@ impl SocialAgentProfile {
         let delta = intensity.clamp(0.0, 1.0) * if positive { 0.1 } else { -0.15 };
         self.reputation = (self.reputation + delta).clamp(0.0, 1.0);
         self.warmth = (self.warmth + delta * 0.8).clamp(0.0, 1.0);
+        let dominance_delta = intensity.clamp(0.0, 1.0) * if positive { 0.04 } else { -0.03 };
+        self.dominance = (self.dominance + dominance_delta).clamp(0.0, 1.0);
+        let competence_delta = intensity.clamp(0.0, 1.0) * if positive { 0.05 } else { -0.05 };
+        self.competence = (self.competence + competence_delta).clamp(0.0, 1.0);
         self.interaction_count += 1;
         self.last_interaction = Utc::now();
     }
@@ -99,11 +103,15 @@ impl SocialCognition {
         }
     }
 
+    pub fn profile_snapshot(&self, agent_id: &str) -> Option<SocialAgentProfile> {
+        self.agents.get(agent_id).cloned()
+    }
+
     pub fn infer_theory_of_mind(&mut self, agent_id: &str, cue: &str) -> TheoryOfMindState {
         let cue_lower = cue.to_lowercase();
         let profile = self.profile(agent_id);
 
-        let (intent, emotion, confidence, evidence) = if cue_lower.contains("help")
+        let (mut intent, mut emotion, confidence, mut evidence) = if cue_lower.contains("help")
             || cue_lower.contains("assist")
             || cue_lower.contains("support")
         {
@@ -140,11 +148,30 @@ impl SocialCognition {
         };
 
         let reputation_bias = (profile.reputation - 0.5) * 0.2;
+        let warmth_bias = (profile.warmth - 0.5) * 0.2;
+        let dominance_bias = (profile.dominance - 0.5) * 0.15;
+
+        if intent == "neutral" && evidence.iter().any(|e| e == "baseline") {
+            if warmth_bias > 0.08 {
+                intent = "cooperative".to_string();
+                emotion = "friendly".to_string();
+                evidence.push("warmth_bias".to_string());
+            } else if warmth_bias < -0.08 {
+                intent = "guarded".to_string();
+                emotion = "wary".to_string();
+                evidence.push("low_warmth_bias".to_string());
+            }
+        }
+        if dominance_bias > 0.1 {
+            evidence.push("dominance_bias".to_string());
+        }
+
         TheoryOfMindState {
             agent_id: agent_id.to_string(),
             inferred_intent: intent,
             inferred_emotion: emotion,
-            confidence: (confidence + reputation_bias).clamp(0.0, 1.0),
+            confidence: (confidence + reputation_bias + warmth_bias * 0.5 + dominance_bias * 0.3)
+                .clamp(0.0, 1.0),
             evidence,
         }
     }
