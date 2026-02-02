@@ -566,6 +566,22 @@ impl WorldModel {
         self.update_stats();
     }
 
+    /// Record a prediction error summary for learning and planning.
+    pub fn record_prediction_error(&mut self, description: &str, magnitude: f64, confidence: f64) {
+        let mut prediction = WorldPrediction::new(description, PropertyValue::Null);
+        prediction.evaluated = true;
+        prediction.correct = Some(magnitude < 0.2);
+        prediction.error_magnitude = Some(magnitude.clamp(0.0, 1.0));
+        prediction.confidence = confidence.clamp(0.0, 1.0);
+
+        self.prediction_history.push(prediction);
+        while self.prediction_history.len() > self.max_history {
+            self.prediction_history.remove(0);
+        }
+
+        self.update_stats();
+    }
+
     /// Get prediction accuracy
     pub fn prediction_accuracy(&self) -> f64 {
         let evaluated: Vec<_> = self
@@ -802,6 +818,15 @@ mod tests {
             WorldPrediction::new("Test prediction", PropertyValue::Number(100.0));
         wrong_prediction.evaluate(PropertyValue::Number(200.0));
         assert_eq!(wrong_prediction.correct, Some(false));
+    }
+
+    #[test]
+    fn test_prediction_error_recording() {
+        let mut model = WorldModel::new();
+        model.record_prediction_error("test_error", 0.4, 0.6);
+
+        assert_eq!(model.prediction_history().len(), 1);
+        assert_eq!(model.stats().evaluated_predictions, 1);
     }
 
     #[test]

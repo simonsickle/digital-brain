@@ -561,6 +561,16 @@ impl ActionSelector {
         self.exploration_rate = rate.clamp(0.0, 1.0);
     }
 
+    /// Adjust exploration rate by a delta (positive = more exploration).
+    pub fn adjust_exploration_rate(&mut self, delta: f64) {
+        self.exploration_rate = (self.exploration_rate + delta).clamp(0.0, 1.0);
+    }
+
+    /// Get current exploration rate.
+    pub fn exploration_rate(&self) -> f64 {
+        self.exploration_rate
+    }
+
     /// Set learning rate
     pub fn set_learning_rate(&mut self, rate: f64) {
         self.learning_rate = rate.clamp(0.0, 1.0);

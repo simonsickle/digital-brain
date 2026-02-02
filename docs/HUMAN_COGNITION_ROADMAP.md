@@ -24,9 +24,9 @@ Create a cognitive architecture indistinguishable from human cognition.
 ### 5. Sleep & Dreams ✅
 - **Current coverage:** `src/core/sleep.rs` orchestrates multi-stage sleep, dream generation via the imagination engine, and exposes `Brain::sleep`; sleep pressure now informs hypothalamic fatigue drives, dream insights are logged, and schema updates run post-REM.
 
-### 6. Predictive Processing ⚠️ (partial)
+### 6. Predictive Processing ✅
 - **Current coverage:** Hierarchical predictive coding now spans sensory/perceptual/conceptual layers in `src/core/prediction.rs`, with active inference proposals feeding prefrontal focus and attentional retuning via `Brain::process`.
-- **Next focus:** Tie predictive errors into world-model planning and action selection for long-horizon error minimization.
+- **Implemented:** Prediction errors now update the world-model record and adapt exploration/action selection to minimize future errors.
 
 ### 7. Attention Networks ⚠️ (partial)
 - **Current coverage:** Attention budgeting (`src/core/attention.rs`), thalamic gating, and prefrontal focus provide baseline competition.

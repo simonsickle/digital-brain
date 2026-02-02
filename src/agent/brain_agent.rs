@@ -364,6 +364,28 @@ impl BrainAgent {
                 "sensory".to_string()
             });
         }
+
+        if !result.errors.is_empty() {
+            let avg_error = result.errors.iter().map(|e| e.error_magnitude).sum::<f64>()
+                / result.errors.len() as f64;
+            world.update_entity_property(entity_id, "prediction_error", avg_error);
+
+            let domain = result
+                .errors
+                .first()
+                .map(|e| e.domain.as_str())
+                .unwrap_or("unknown");
+            world.record_prediction_error(
+                &format!("prediction_error:{}", domain),
+                avg_error,
+                confidence,
+            );
+
+            let adjustment = (avg_error - 0.3) * 0.15;
+            if adjustment.abs() > 0.01 {
+                self.agent.actions_mut().adjust_exploration_rate(adjustment);
+            }
+        }
     }
 
     /// Run a single cycle of the brain-agent
@@ -582,7 +604,9 @@ fn unique_strings(values: Vec<String>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::prediction::{PredictionError, PredictionLayer};
     use crate::core::{ActionCategory, ExpectedOutcome, Outcome, Priority};
+    use chrono::Utc;
     use std::time::Duration;
 
     fn make_test_action(name: &str) -> ActionTemplate {
@@ -690,6 +714,34 @@ mod tests {
         let scene = scenes[0];
         assert!(scene.get_property("modalities").is_some());
         assert!(scene.get_property("features").is_some());
+    }
+
+    #[test]
+    fn test_prediction_errors_adjust_exploration() {
+        let mut agent = BrainAgent::new().unwrap();
+        agent.register_action(make_test_action("test"));
+
+        let mut result = agent.process("A sudden unexpected flash").unwrap();
+        let base_rate = agent.agent().actions().exploration_rate();
+
+        let error = PredictionError {
+            prediction_id: Uuid::new_v4(),
+            layer: PredictionLayer::Conceptual,
+            domain: "percept".to_string(),
+            source: "test".to_string(),
+            expected: serde_json::Value::String("dark".to_string()),
+            actual: serde_json::Value::String("flash".to_string()),
+            error_magnitude: 0.8,
+            error_direction: 0.8,
+            surprise: 0.8,
+            computed_at: Utc::now(),
+        };
+
+        result.errors = vec![error];
+        agent.update_world_model_from_processing("A sudden unexpected flash", &result);
+
+        let new_rate = agent.agent().actions().exploration_rate();
+        assert!(new_rate > base_rate);
     }
 
     #[test]
