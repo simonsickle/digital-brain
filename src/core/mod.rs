@@ -73,7 +73,10 @@ pub use neuromodulators::{
     OxytocinSystem, RewardCategory, RewardQuality, RewardResult, SerotoninSystem, ToleranceTracker,
     TrustLevel,
 };
-pub use prediction::{Prediction, PredictionEngine, PredictionError, PredictionStats};
+pub use prediction::{
+    ActiveInferencePolicy, ActiveInferenceProposal, Prediction, PredictionContext,
+    PredictionEngine, PredictionError, PredictionLayer, PredictionState, PredictionStats,
+};
 pub use salience::{SalienceInputs, SalienceNetwork, SalienceOutcome};
 pub use self_model::{
     AutobiographicalSelf, LifeChapter, LifeEvent, MetacognitiveMonitor, MetacognitiveState,

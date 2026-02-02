@@ -26,8 +26,8 @@ Create a cognitive architecture indistinguishable from human cognition.
 - **Next focus:** Tie sleep pressure to hypothalamic drives, log dream insights, and trigger schema updates post-REM.
 
 ### 6. Predictive Processing ⚠️ (partial)
-- **Current coverage:** `src/core/prediction.rs` delivers prediction error signals and gating via neuromodulators and basal ganglia.
-- **Next focus:** Introduce hierarchical predictive coding and active inference loops that can spawn exploratory actions.
+- **Current coverage:** Hierarchical predictive coding now spans sensory/perceptual/conceptual layers in `src/core/prediction.rs`, with active inference proposals feeding prefrontal focus and attentional retuning via `Brain::process`.
+- **Next focus:** Tie predictive errors into world-model planning and action selection for long-horizon error minimization.
 
 ### 7. Attention Networks ⚠️ (partial)
 - **Current coverage:** Attention budgeting (`src/core/attention.rs`), thalamic gating, and prefrontal focus provide baseline competition.
@@ -65,7 +65,7 @@ Create a cognitive architecture indistinguishable from human cognition.
 9. ✅ Link mood, social context, and attention selection through shared neuromodulator tuning.
 
 ### Phase D: Predictive & Generative Mastery
-10. Layer hierarchical predictive coding and active inference into perception/action loops.
+10. ✅ Layer hierarchical predictive coding and active inference into perception/action loops (prediction context synthesis + active inference proposals).
 11. Integrate imagination outputs with planning and goal management for creative problem solving.
 12. Instrument mood and sleep data to adapt long-horizon strategies and self-narratives.
 

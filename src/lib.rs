@@ -40,10 +40,11 @@ pub mod signal;
 pub use agent::{AgentConfig, AgentCycleResult, AgentLoop, AgentState, Percept, PerceptType};
 pub use brain::{Brain, BrainConfig, BrainStats, ProcessingResult, SleepReport};
 pub use core::{
-    BrainRegion, Broadcast, GabaSystem, GlobalWorkspace, InhibitionResult, NervousSystem,
-    NervousSystemConfig, NervousSystemStats, NeuromodulatorState, NeuromodulatorySystem,
-    OxytocinSystem, Pathway, Prediction, PredictionEngine, PredictionError, RewardCategory,
-    RewardQuality, SignalTrace, TrustLevel,
+    ActiveInferencePolicy, ActiveInferenceProposal, BrainRegion, Broadcast, GabaSystem,
+    GlobalWorkspace, InhibitionResult, NervousSystem, NervousSystemConfig, NervousSystemStats,
+    NeuromodulatorState, NeuromodulatorySystem, OxytocinSystem, Pathway, Prediction,
+    PredictionContext, PredictionEngine, PredictionError, PredictionLayer, PredictionState,
+    RewardCategory, RewardQuality, SignalTrace, TrustLevel,
 };
 pub use error::{BrainError, Result};
 pub use signal::{Arousal, BrainSignal, MemoryTrace, Salience, SignalType, Valence};
@@ -51,8 +52,9 @@ pub use signal::{Arousal, BrainSignal, MemoryTrace, Salience, SignalType, Valenc
 /// Prelude for convenient imports
 pub mod prelude {
     pub use crate::core::{
-        Broadcast, GabaSystem, GlobalWorkspace, InhibitionResult, NeuromodulatorState,
-        NeuromodulatorySystem, OxytocinSystem, Prediction, PredictionEngine, RewardCategory,
+        ActiveInferencePolicy, ActiveInferenceProposal, Broadcast, GabaSystem, GlobalWorkspace,
+        InhibitionResult, NeuromodulatorState, NeuromodulatorySystem, OxytocinSystem, Prediction,
+        PredictionContext, PredictionEngine, PredictionLayer, PredictionState, RewardCategory,
         RewardQuality, TrustLevel,
     };
     pub use crate::error::*;

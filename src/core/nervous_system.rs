@@ -438,6 +438,18 @@ impl NervousSystem {
                 .with_signal_types(vec![SignalType::Prediction, SignalType::Error]),
         );
 
+        // PredictionEngine → Prefrontal (active inference proposals)
+        self.add_pathway(
+            Pathway::new(BrainRegion::PredictionEngine, BrainRegion::Prefrontal, 0.7)
+                .with_signal_types(vec![
+                    SignalType::Prediction,
+                    SignalType::Error,
+                    SignalType::Attention,
+                    SignalType::Query,
+                    SignalType::Motor,
+                ]),
+        );
+
         // Prefrontal → External (motor output, responses)
         self.add_pathway(
             Pathway::new(BrainRegion::Prefrontal, BrainRegion::External, 0.9)

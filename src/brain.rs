@@ -10,7 +10,10 @@ use crate::core::nervous_system::{BrainRegion, NervousSystem, NervousSystemStats
 use crate::core::neuromodulators::{
     NeuromodulatorState, NeuromodulatorySystem, RewardCategory, RewardQuality,
 };
-use crate::core::prediction::{Prediction, PredictionEngine, PredictionError};
+use crate::core::prediction::{
+    ActiveInferencePolicy, ActiveInferenceProposal, Prediction, PredictionContext,
+    PredictionEngine, PredictionError,
+};
 use crate::core::salience::{SalienceInputs, SalienceNetwork};
 use crate::core::social::{SocialCognition, TheoryOfMindState};
 use crate::core::workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
@@ -77,6 +80,8 @@ pub struct ProcessingResult {
     pub predictions: Vec<Prediction>,
     /// Any prediction errors detected
     pub errors: Vec<PredictionError>,
+    /// Active inference proposal (if any)
+    pub active_inference: Option<ActiveInferenceProposal>,
     /// Reflections triggered
     pub reflections: Vec<String>,
     /// Cortical feature maps derived from sensory processing
@@ -246,6 +251,7 @@ impl Brain {
                 memory: None,
                 predictions: Vec::new(),
                 errors: Vec::new(),
+                active_inference: None,
                 reflections: Vec::new(),
                 cortical_features: Vec::new(),
                 multimodal_context: None,
@@ -320,6 +326,10 @@ impl Brain {
                 .insert("salience_network".to_string(), value);
         }
 
+        let mut reached_consciousness = false;
+        let mut memory = None;
+        let mut reflections = Vec::new();
+
         // 3.5 Neuromodulatory response to emotional content
         if emotion.is_significant {
             // Emotional content affects norepinephrine (arousal)
@@ -335,6 +345,84 @@ impl Brain {
             }
         }
 
+        // 3.6 Hierarchical predictive coding + active inference
+        self.prediction.clear_expired();
+        let prediction_context = self.build_prediction_context(
+            &content,
+            &cortical_features,
+            multimodal_context.as_ref(),
+            &tagged_signal,
+        );
+        let prediction_errors = self.prediction.evaluate_hierarchical(&prediction_context);
+        let predictions = self.prediction.predict_hierarchical(&prediction_context);
+        let active_inference = self
+            .prediction
+            .active_inference(&prediction_context, &prediction_errors);
+
+        if !prediction_errors.is_empty() {
+            let avg_error = prediction_errors
+                .iter()
+                .map(|e| e.error_magnitude)
+                .sum::<f64>()
+                / prediction_errors.len() as f64;
+            if let Ok(value) = serde_json::to_value(avg_error) {
+                tagged_signal
+                    .metadata
+                    .insert("prediction_error".to_string(), value);
+            }
+
+            for error in &prediction_errors {
+                let error_signal = error.to_signal("prediction_engine");
+                self.nervous_system.transmit(
+                    BrainRegion::PredictionEngine,
+                    BrainRegion::Amygdala,
+                    error_signal.clone(),
+                );
+                self.nervous_system.transmit(
+                    BrainRegion::PredictionEngine,
+                    BrainRegion::Hippocampus,
+                    error_signal.clone(),
+                );
+
+                if error.error_magnitude > 0.6 {
+                    self.acc.prediction_error(
+                        &format!("expected {}", error.domain),
+                        &format!("actual {}", error.actual),
+                        error.error_magnitude,
+                    );
+                }
+            }
+        }
+
+        if let Some(proposal) = &active_inference {
+            let inference_signal = proposal.to_signal("prediction_engine");
+            self.nervous_system.transmit(
+                BrainRegion::PredictionEngine,
+                BrainRegion::Prefrontal,
+                inference_signal.clone(),
+            );
+            self.prefrontal.load(&inference_signal);
+
+            if let Some(target) = &proposal.target
+                && matches!(
+                    proposal.policy,
+                    ActiveInferencePolicy::SeekInformation
+                        | ActiveInferencePolicy::RefocusAttention
+                        | ActiveInferencePolicy::ExploreNovelty
+                )
+            {
+                self.thalamus.focus_attention(target.clone());
+            }
+
+            if proposal.expected_error_reduction > 0.5 {
+                reflections.push(format!(
+                    "Active inference: {} ({})",
+                    proposal.policy.label(),
+                    proposal.rationale
+                ));
+            }
+        }
+
         // 4. Update DMN emotional state
         self.dmn
             .update_emotional_state(tagged_signal.valence.value());
@@ -345,10 +433,6 @@ impl Brain {
             .record_mood(tagged_signal.valence.value());
 
         // 5. Route to appropriate modules
-        let mut reached_consciousness = false;
-        let mut memory = None;
-        let mut reflections = Vec::new();
-
         for dest in &routed.destinations {
             match dest {
                 Destination::VisualCortex
@@ -503,8 +587,9 @@ impl Brain {
             emotion,
             reached_consciousness,
             memory,
-            predictions: Vec::new(),
-            errors: Vec::new(),
+            predictions,
+            errors: prediction_errors,
+            active_inference,
             reflections,
             cortical_features,
             multimodal_context,
@@ -792,6 +877,84 @@ impl Brain {
                 episode_id,
                 triggers,
             );
+        }
+    }
+
+    fn build_prediction_context(
+        &mut self,
+        content: &str,
+        cortical_features: &[CorticalRepresentation],
+        multimodal_context: Option<&MultimodalContext>,
+        tagged_signal: &BrainSignal,
+    ) -> PredictionContext {
+        let tokens = tokenize_content(content);
+
+        let (features, anchors, modalities, novelty, detail, confidence) =
+            if let Some(context) = multimodal_context {
+                (
+                    context.integrated_features.clone(),
+                    context.anchors.clone(),
+                    context.modalities.iter().map(|m| m.to_string()).collect(),
+                    context.novelty,
+                    context.detail_level,
+                    context.confidence,
+                )
+            } else {
+                let mut features = Vec::new();
+                let mut anchors = Vec::new();
+                let mut modalities = Vec::new();
+                let mut confidence_sum = 0.0;
+                let mut novelty_sum = 0.0;
+                let mut detail_sum = 0.0;
+
+                for rep in cortical_features {
+                    modalities.push(rep.modality.to_string());
+                    for feature in rep.detected_features.iter().take(3) {
+                        features.push(format!("{}:{}", rep.modality, feature));
+                    }
+                    if let Some(primary) = rep.primary_focus.clone() {
+                        anchors.push(primary);
+                    }
+                    confidence_sum += rep.confidence;
+                    novelty_sum += rep.novelty;
+                    detail_sum += rep.detail_level;
+                }
+
+                let count = cortical_features.len().max(1) as f64;
+                (
+                    features,
+                    anchors,
+                    modalities,
+                    novelty_sum / count,
+                    detail_sum / count,
+                    confidence_sum / count,
+                )
+            };
+
+        let schema_matches = if content.is_empty() {
+            Vec::new()
+        } else {
+            self.schemas.find(content)
+        };
+        let schemas: Vec<String> = schema_matches
+            .iter()
+            .map(|schema| schema.pattern.clone())
+            .take(4)
+            .collect();
+
+        PredictionContext {
+            content: content.to_string(),
+            tokens,
+            features: dedupe_strings(features),
+            anchors: dedupe_strings(anchors),
+            schemas,
+            modalities: dedupe_strings(modalities),
+            salience: tagged_signal.salience.value(),
+            valence: tagged_signal.valence.value(),
+            arousal: tagged_signal.arousal.value(),
+            novelty,
+            detail,
+            confidence,
         }
     }
 
@@ -1709,6 +1872,20 @@ fn feature_triggers(feature: &str) -> Vec<String> {
         }
     }
     triggers
+}
+
+fn tokenize_content(content: &str) -> Vec<String> {
+    content
+        .split_whitespace()
+        .filter_map(|word| {
+            let trimmed = word.trim_matches(|c: char| !c.is_alphanumeric());
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_lowercase())
+            }
+        })
+        .collect()
 }
 
 fn dedupe_strings(values: Vec<String>) -> Vec<String> {
