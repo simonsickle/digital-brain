@@ -61,7 +61,7 @@ Create a cognitive architecture indistinguishable from human cognition.
 
 ### Phase C: Salience & Social Reasoning
 7. ✅ Formalize dorsal/ventral attention and the salience network (anterior insula + dorsal ACC).
-8. Expand social cognition with theory-of-mind reasoning, reputation tracking, and mirror-system support.
+8. ✅ Expand social cognition with theory-of-mind reasoning, reputation tracking, and mirror-system support.
 9. Link mood, social context, and attention selection through shared neuromodulator tuning.
 
 ### Phase D: Predictive & Generative Mastery

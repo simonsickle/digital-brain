@@ -18,6 +18,7 @@ pub mod salience;
 pub mod self_model;
 pub mod sensory;
 pub mod sleep;
+pub mod social;
 pub mod stimulus;
 pub mod temporal;
 pub mod workspace;
@@ -86,6 +87,7 @@ pub use sleep::{
     Dream, SleepConfig, SleepSession, SleepStage, SleepStats, SleepSystem, SleepTickResult,
     WakeReason,
 };
+pub use social::{SocialAgentProfile, SocialCognition, SocialUpdate, TheoryOfMindState};
 pub use stimulus::{
     DriveEvent, FileEvent, GoalEvent as StimulusGoalEvent, Stimulus, StimulusKind,
     StimulusPriority, StimulusResponse, StimulusSource, SystemEvent, TimeEvent,

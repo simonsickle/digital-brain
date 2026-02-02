@@ -12,6 +12,7 @@ use crate::core::neuromodulators::{
 };
 use crate::core::prediction::{Prediction, PredictionEngine, PredictionError};
 use crate::core::salience::{SalienceInputs, SalienceNetwork};
+use crate::core::social::{SocialCognition, TheoryOfMindState};
 use crate::core::workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
 use crate::error::{BrainError, Result};
 use crate::regions::acc::{ACC, ControlSignal};
@@ -130,6 +131,8 @@ pub struct Brain {
     pub attention: AttentionBudget,
     /// Salience network (dorsal/ventral attention coordination)
     pub salience_network: SalienceNetwork,
+    /// Social cognition (theory of mind, reputation, hierarchy)
+    pub social_cognition: SocialCognition,
     /// Action selection and habit formation
     pub basal_ganglia: BasalGanglia,
     /// Error detection and conflict monitoring
@@ -191,6 +194,7 @@ impl Brain {
             schemas: SchemaStore::new(),
             attention: AttentionBudget::new(100_000), // 100k token budget
             salience_network: SalienceNetwork::new(),
+            social_cognition: SocialCognition::new(),
             basal_ganglia: BasalGanglia::new(),
             acc: ACC::new(),
             cerebellum: Cerebellum::new(),
@@ -1082,6 +1086,7 @@ impl Brain {
         self.neuromodulators.record_positive_interaction(entity);
         // Also record in DMN's agent model
         self.dmn.get_agent_model(entity).record_interaction(true);
+        self.social_cognition.observe_interaction(entity, true, 0.7);
     }
 
     /// Record a negative interaction (betrayal, reduces trust)
@@ -1089,6 +1094,8 @@ impl Brain {
         self.neuromodulators.record_negative_interaction(entity);
         // Also record in DMN's agent model
         self.dmn.get_agent_model(entity).record_interaction(false);
+        self.social_cognition
+            .observe_interaction(entity, false, 0.7);
     }
 
     /// Get trust level for an entity (0-1)
@@ -1109,6 +1116,21 @@ impl Brain {
     /// Get information weight for a source (trusted = higher weight)
     pub fn source_weight(&self, source: &str) -> f64 {
         self.neuromodulators.source_weight(source)
+    }
+
+    /// Infer another agent's likely intent/emotion from a cue.
+    pub fn infer_social_state(&mut self, agent_id: &str, cue: &str) -> TheoryOfMindState {
+        self.social_cognition.infer_theory_of_mind(agent_id, cue)
+    }
+
+    /// Get current reputation estimate for an agent.
+    pub fn social_reputation(&self, agent_id: &str) -> Option<f64> {
+        self.social_cognition.reputation(agent_id)
+    }
+
+    /// Get current social hierarchy ranking.
+    pub fn social_hierarchy(&self) -> Vec<(String, f64)> {
+        self.social_cognition.hierarchy()
     }
 
     /// Check if the brain advises patience (waiting for better outcome).
@@ -1943,6 +1965,16 @@ mod tests {
 
         let updated = brain.insula.body_state.heart_rate;
         assert!(updated >= initial);
+    }
+
+    #[test]
+    fn test_social_cognition_inference() {
+        let mut brain = Brain::new().unwrap();
+        brain.record_positive_interaction("ally");
+
+        let inference = brain.infer_social_state("ally", "Can you help me?");
+        assert_eq!(inference.inferred_intent, "cooperative");
+        assert!(brain.social_reputation("ally").unwrap_or(0.0) > 0.5);
     }
 
     #[test]
