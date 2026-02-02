@@ -369,6 +369,7 @@ impl ConsciousnessLoop {
 
             if self.config.enable_mind_wandering
                 && self.idle_cycles > self.config.idle_threshold_cycles
+                && self.can_mind_wander()
             {
                 self.state = ConsciousnessState::MindWandering;
                 if let Some(action) = self.processor.mind_wander(&context) {
@@ -541,6 +542,18 @@ impl ConsciousnessLoop {
         self.stimulus_queue.pop_front()
     }
 
+    fn can_mind_wander(&self) -> bool {
+        let recent: Vec<_> = self.recent_stimuli.iter().rev().take(5).collect();
+        if recent.is_empty() {
+            return true;
+        }
+
+        let avg_salience = recent.iter().map(|s| s.salience).sum::<f64>() / recent.len() as f64;
+        let has_high_priority = recent.iter().any(|s| s.priority >= StimulusPriority::High);
+
+        avg_salience < 0.6 && !has_high_priority
+    }
+
     fn build_context(&self) -> ProcessingContext {
         ProcessingContext {
             cycle: self.cycle,
@@ -694,6 +707,19 @@ mod tests {
 
         // Should eventually enter mind wandering state
         // (might not happen in 20 cycles depending on timing)
+    }
+
+    #[test]
+    fn test_mind_wandering_suppressed_by_salience() {
+        let mut consciousness = make_test_loop();
+
+        let stimulus = Stimulus::from_prompt("urgent", None)
+            .with_priority(StimulusPriority::High)
+            .with_salience(0.9);
+        consciousness.enqueue_stimulus(stimulus);
+        consciousness.cycle();
+
+        assert!(!consciousness.can_mind_wander());
     }
 
     #[test]

@@ -28,9 +28,9 @@ Create a cognitive architecture indistinguishable from human cognition.
 - **Current coverage:** Hierarchical predictive coding now spans sensory/perceptual/conceptual layers in `src/core/prediction.rs`, with active inference proposals feeding prefrontal focus and attentional retuning via `Brain::process`.
 - **Implemented:** Prediction errors now update the world-model record and adapt exploration/action selection to minimize future errors.
 
-### 7. Attention Networks ⚠️ (partial)
+### 7. Attention Networks ✅
 - **Current coverage:** Attention budgeting (`src/core/attention.rs`), thalamic gating, and prefrontal focus provide baseline competition.
-- **Next focus:** Separate dorsal/ventral attention pathways, add salience network coordination, and refine mind-wandering control.
+- **Implemented:** Dorsal/ventral salience coordination is active, and mind-wandering now respects recent salience/priority to prevent premature drift.
 
 ### 8. Social Cognition ⚠️ (partial)
 - **Current coverage:** Trust/oxytocin signalling, empathic insula responses, and multi-agent messaging support proto-social awareness.
