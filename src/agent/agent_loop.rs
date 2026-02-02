@@ -221,6 +221,8 @@ pub struct AgentCycleResult {
     pub cycle_duration: Duration,
     /// Any messages/outputs to emit
     pub outputs: Vec<AgentOutput>,
+    /// Planning suggestions derived from imagination
+    pub planning_suggestions: Vec<PlanningSuggestion>,
 }
 
 /// Output from the agent (communication, etc.)
@@ -449,7 +451,7 @@ impl AgentLoop {
         let percepts_processed = self.process_percepts(&mut outputs);
 
         // 1.5 Integrate imagination-driven plans
-        self.process_imaginations(&mut outputs);
+        let planning_suggestions = self.process_imaginations(&mut outputs);
 
         // 2. Check goals
         self.update_active_goals();
@@ -523,6 +525,7 @@ impl AgentLoop {
             percepts_processed,
             cycle_duration,
             outputs,
+            planning_suggestions,
         }
     }
 
@@ -582,12 +585,13 @@ impl AgentLoop {
         count
     }
 
-    fn process_imaginations(&mut self, outputs: &mut Vec<AgentOutput>) {
+    fn process_imaginations(&mut self, outputs: &mut Vec<AgentOutput>) -> Vec<PlanningSuggestion> {
         if self.imagination_buffer.is_empty() {
-            return;
+            return Vec::new();
         }
 
         let imaginings: Vec<_> = self.imagination_buffer.drain(..).collect();
+        let mut suggestions = Vec::new();
 
         for imagining in imaginings {
             let suggestion = self.imagination_planner.plan_from_imagining(&imagining);
@@ -609,7 +613,11 @@ impl AgentLoop {
                     valence: Valence::new(0.2),
                 });
             }
+
+            suggestions.push(suggestion);
         }
+
+        suggestions
     }
 
     fn apply_planning_suggestion(&mut self, suggestion: &PlanningSuggestion) -> (usize, usize) {

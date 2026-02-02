@@ -40,9 +40,9 @@ Create a cognitive architecture indistinguishable from human cognition.
 - **Implemented:** `src/core/temporal.rs` handles duration perception, mental time travel, prospective memory, and temporal discounting.
 - **Implemented:** Goal deadlines now register prospective intentions and future moments; goal outcomes feed episodic memories for proactive planning.
 
-### 10. Creativity & Imagination ⚠️ (partial)
+### 10. Creativity & Imagination ✅
 - **Current coverage:** `src/core/imagination.rs` recombines memories, generates counterfactuals, and fuels dream content; imagination outputs now feed planning via the `ImaginationPlanner` bridge into goals/actions.
-- **Next focus:** Extend imagination-guided analogies and map creative insights into structured plans in the world model.
+- **Implemented:** Imagination analogies now surface as concept links, and imagination-driven plans are mapped into world-model plan/goal/action entities.
 
 ---
 

@@ -19,14 +19,17 @@
 
 use uuid::Uuid;
 
+use serde_json::Value;
+
 use crate::agent::{
     AgentConfig, AgentLoop, AgentProfile, CommunicationSystem, IntentType, MultiAgentSystem,
     Percept,
 };
 use crate::brain::{Brain, BrainConfig, ProcessingResult, SleepReport};
 use crate::core::{
-    ActionTemplate, CuriositySystem, Domain, Entity, Goal, GoalId, Imagining, PropertyValue,
-    StrategyRegulator, StrategySignal, WorldModel,
+    ActionTemplate, CuriositySystem, Domain, Entity, EntityId, Goal, GoalId, Imagining,
+    PlanningSuggestion, PropertyValue, RelationType, Relationship, StrategyRegulator,
+    StrategySignal, WorldModel,
 };
 use crate::error::Result;
 
@@ -388,6 +391,218 @@ impl BrainAgent {
         }
     }
 
+    fn update_world_model_from_imagining(&mut self, imagining: &Imagining) {
+        let Some(world) = self.world.as_mut() else {
+            return;
+        };
+
+        let imagination_name = format!("imagination:{}", imagining.id);
+        let imagination_id = find_entity_id(world, &imagination_name, "imagination")
+            .unwrap_or_else(|| {
+                let mut entity = Entity::new("imagination", &imagination_name)
+                    .with_property("content", imagining.content.clone())
+                    .with_property("imagination_type", imagining.imagination_type.to_string())
+                    .with_property("created_at", imagining.created_at.to_rfc3339())
+                    .with_property("confidence", imagining.confidence)
+                    .with_property("novelty", imagining.novelty)
+                    .with_property("utility", imagining.utility)
+                    .with_confidence(imagining.confidence)
+                    .with_tag("imagination");
+
+                let type_tag = imagining.imagination_type.to_string();
+                entity = entity.with_tag(&type_tag);
+
+                if !imagining.source_memory_ids.is_empty() {
+                    entity = entity.with_property(
+                        "source_memories",
+                        property_list(&imagining.source_memory_ids),
+                    );
+                }
+
+                world.add_entity(entity)
+            });
+
+        world.update_entity_property(imagination_id, "content", imagining.content.clone());
+        world.update_entity_property(
+            imagination_id,
+            "imagination_type",
+            imagining.imagination_type.to_string(),
+        );
+        world.update_entity_property(imagination_id, "confidence", imagining.confidence);
+        world.update_entity_property(imagination_id, "novelty", imagining.novelty);
+        world.update_entity_property(imagination_id, "utility", imagining.utility);
+        world.update_entity_property(
+            imagination_id,
+            "created_at",
+            imagining.created_at.to_rfc3339(),
+        );
+        if !imagining.source_memory_ids.is_empty() {
+            world.update_entity_property(
+                imagination_id,
+                "source_memories",
+                property_list(&imagining.source_memory_ids),
+            );
+        }
+
+        for (key, value) in &imagining.metadata {
+            if let Some(property) = json_to_property(value) {
+                world.update_entity_property(imagination_id, &format!("meta_{}", key), property);
+            }
+        }
+
+        if let Some(entity) = world.get_entity_mut(imagination_id) {
+            entity.confidence = imagining.confidence;
+            ensure_tag(&mut entity.tags, "imagination");
+            ensure_tag(&mut entity.tags, &imagining.imagination_type.to_string());
+        }
+
+        let analogies = extract_analogy_terms(imagining);
+        if analogies.is_empty() {
+            return;
+        }
+
+        let strength = (imagining.novelty * 0.6 + imagining.confidence * 0.4).clamp(0.1, 1.0);
+        for (term, origin) in analogies {
+            let concept_id = ensure_concept_entity(world, &term, imagining.confidence);
+            let relationship =
+                Relationship::new(imagination_id, concept_id, RelationType::SimilarTo)
+                    .with_strength(strength)
+                    .with_metadata("origin", origin)
+                    .with_metadata("source", "imagination");
+            add_relationship_if_missing(world, relationship);
+        }
+    }
+
+    fn update_world_model_from_planning_suggestions(&mut self, suggestions: &[PlanningSuggestion]) {
+        if suggestions.is_empty() {
+            return;
+        }
+
+        for suggestion in suggestions {
+            self.update_world_model_from_planning_suggestion(suggestion);
+        }
+    }
+
+    fn update_world_model_from_planning_suggestion(&mut self, suggestion: &PlanningSuggestion) {
+        if suggestion.is_empty() {
+            return;
+        }
+
+        let Some(world) = self.world.as_mut() else {
+            return;
+        };
+
+        let imagination_name = format!("imagination:{}", suggestion.imagining_id);
+        let imagination_id = find_entity_id(world, &imagination_name, "imagination")
+            .unwrap_or_else(|| {
+                let mut entity = Entity::new("imagination", &imagination_name)
+                    .with_property("imagination_type", suggestion.imagination_type.to_string())
+                    .with_confidence((suggestion.score * 0.8 + 0.2).clamp(0.0, 1.0))
+                    .with_tag("imagination");
+                let type_tag = suggestion.imagination_type.to_string();
+                entity = entity.with_tag(&type_tag);
+                world.add_entity(entity)
+            });
+
+        let plan_name = format!("plan:{}", suggestion.imagining_id);
+        let plan_id = find_entity_id(world, &plan_name, "plan").unwrap_or_else(|| {
+            let mut entity = Entity::new("plan", &plan_name)
+                .with_property("imagination_id", suggestion.imagining_id.to_string())
+                .with_property("imagination_type", suggestion.imagination_type.to_string())
+                .with_property("rationale", suggestion.rationale.clone())
+                .with_property("score", suggestion.score)
+                .with_property("goal_count", suggestion.goals.len() as f64)
+                .with_property("action_count", suggestion.actions.len() as f64)
+                .with_confidence(suggestion.score)
+                .with_tag("plan")
+                .with_tag("imagination");
+            let type_tag = suggestion.imagination_type.to_string();
+            entity = entity.with_tag(&type_tag);
+            world.add_entity(entity)
+        });
+
+        world.update_entity_property(plan_id, "rationale", suggestion.rationale.clone());
+        world.update_entity_property(plan_id, "score", suggestion.score);
+        world.update_entity_property(plan_id, "goal_count", suggestion.goals.len() as f64);
+        world.update_entity_property(plan_id, "action_count", suggestion.actions.len() as f64);
+
+        let plan_link = Relationship::new(imagination_id, plan_id, RelationType::Causes)
+            .with_strength(suggestion.score)
+            .with_metadata("source", "imagination");
+        add_relationship_if_missing(world, plan_link);
+
+        for goal in &suggestion.goals {
+            let goal_name = format!("plan:{}:goal:{}", suggestion.imagining_id, goal.id);
+            let goal_id = find_entity_id(world, &goal_name, "goal").unwrap_or_else(|| {
+                let mut entity = Entity::new("goal", &goal_name)
+                    .with_property("description", goal.description.clone())
+                    .with_property("priority", goal.priority.as_f64())
+                    .with_property("priority_label", format!("{:?}", goal.priority))
+                    .with_property("time_horizon", format!("{:?}", goal.time_horizon))
+                    .with_property("effort", goal.estimated_effort)
+                    .with_property("notes", goal.notes.clone())
+                    .with_confidence(goal.priority.as_f64())
+                    .with_tag("goal")
+                    .with_tag("imagination");
+
+                if !goal.tags.is_empty() {
+                    entity = entity.with_property("tags", property_list(&goal.tags));
+                }
+
+                if let Some(deadline) = goal.deadline {
+                    entity = entity.with_property("deadline", deadline.to_rfc3339());
+                }
+
+                world.add_entity(entity)
+            });
+
+            world.update_entity_property(goal_id, "description", goal.description.clone());
+            world.update_entity_property(goal_id, "priority", goal.priority.as_f64());
+            world.update_entity_property(goal_id, "notes", goal.notes.clone());
+            if !goal.tags.is_empty() {
+                world.update_entity_property(goal_id, "tags", property_list(&goal.tags));
+            }
+
+            let relationship = Relationship::new(plan_id, goal_id, RelationType::Contains)
+                .with_strength(goal.priority.as_f64())
+                .with_metadata("source", "imagination_plan");
+            add_relationship_if_missing(world, relationship);
+        }
+
+        for action in &suggestion.actions {
+            let action_name = format!("plan:{}:action:{}", suggestion.imagining_id, action.id);
+            let action_id = find_entity_id(world, &action_name, "action").unwrap_or_else(|| {
+                let mut entity = Entity::new("action", &action_name)
+                    .with_property("name", action.name.clone())
+                    .with_property("description", action.description.clone())
+                    .with_property("category", format!("{:?}", action.category))
+                    .with_property("effort_cost", action.effort_cost)
+                    .with_property("time_cost", action.time_cost as f64)
+                    .with_confidence(suggestion.score)
+                    .with_tag("action")
+                    .with_tag("imagination");
+
+                if !action.tags.is_empty() {
+                    entity = entity.with_property("tags", property_list(&action.tags));
+                }
+
+                world.add_entity(entity)
+            });
+
+            world.update_entity_property(action_id, "description", action.description.clone());
+            world.update_entity_property(action_id, "effort_cost", action.effort_cost);
+            world.update_entity_property(action_id, "time_cost", action.time_cost as f64);
+            if !action.tags.is_empty() {
+                world.update_entity_property(action_id, "tags", property_list(&action.tags));
+            }
+
+            let relationship = Relationship::new(plan_id, action_id, RelationType::Contains)
+                .with_strength((1.0 - action.effort_cost).clamp(0.0, 1.0))
+                .with_metadata("source", "imagination_plan");
+            add_relationship_if_missing(world, relationship);
+        }
+    }
+
     /// Run a single cycle of the brain-agent
     pub fn tick(&mut self) -> BrainAgentCycleResult {
         self.stats.total_cycles += 1;
@@ -407,6 +622,7 @@ impl BrainAgent {
 
         // Run agent cycle
         let agent_result = self.agent.tick();
+        self.update_world_model_from_planning_suggestions(&agent_result.planning_suggestions);
 
         // Track actions
         if agent_result.executed_action.is_some() {
@@ -475,11 +691,16 @@ impl BrainAgent {
 
     /// Submit an imagination for planning integration
     pub fn submit_imagining(&mut self, imagining: Imagining) {
+        self.update_world_model_from_imagining(&imagining);
         self.agent.submit_imagining(imagining);
     }
 
     /// Submit multiple imaginations for planning integration
     pub fn submit_imaginations(&mut self, imaginings: impl IntoIterator<Item = Imagining>) {
+        let imaginings: Vec<Imagining> = imaginings.into_iter().collect();
+        for imagining in &imaginings {
+            self.update_world_model_from_imagining(imagining);
+        }
         self.agent.submit_imaginations(imaginings);
     }
 
@@ -609,6 +830,133 @@ fn unique_strings(values: Vec<String>) -> Vec<String> {
     deduped
 }
 
+fn json_to_property(value: &Value) -> Option<PropertyValue> {
+    match value {
+        Value::Null => None,
+        Value::Bool(b) => Some(PropertyValue::Boolean(*b)),
+        Value::Number(n) => n.as_f64().map(PropertyValue::Number),
+        Value::String(s) => Some(PropertyValue::String(s.clone())),
+        Value::Array(values) => {
+            let list: Vec<PropertyValue> = values.iter().filter_map(json_to_property).collect();
+            Some(PropertyValue::List(list))
+        }
+        Value::Object(_) => Some(PropertyValue::String(value.to_string())),
+    }
+}
+
+fn extract_analogy_terms(imagining: &Imagining) -> Vec<(String, &'static str)> {
+    let mut terms = Vec::new();
+    collect_terms(&imagining.metadata, "patterns", "pattern", &mut terms);
+    collect_terms(&imagining.metadata, "topics", "topic", &mut terms);
+    collect_terms(&imagining.metadata, "key_factors", "factor", &mut terms);
+    collect_terms(&imagining.metadata, "domain", "domain", &mut terms);
+    collect_terms(
+        &imagining.metadata,
+        "implications",
+        "implication",
+        &mut terms,
+    );
+
+    let mut seen = std::collections::HashSet::new();
+    let mut deduped = Vec::new();
+    for (term, origin) in terms {
+        if let Some(clean) = sanitize_term(&term) {
+            let key = clean.to_lowercase();
+            if seen.insert(key) {
+                deduped.push((clean, origin));
+            }
+        }
+        if deduped.len() >= 8 {
+            break;
+        }
+    }
+    deduped
+}
+
+fn collect_terms(
+    metadata: &std::collections::HashMap<String, Value>,
+    key: &str,
+    origin: &'static str,
+    terms: &mut Vec<(String, &'static str)>,
+) {
+    let Some(value) = metadata.get(key) else {
+        return;
+    };
+
+    match value {
+        Value::String(s) => terms.push((s.clone(), origin)),
+        Value::Array(items) => {
+            for item in items {
+                if let Value::String(s) = item {
+                    terms.push((s.clone(), origin));
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn sanitize_term(term: &str) -> Option<String> {
+    let trimmed = term.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.len() > 64 {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
+fn find_entity_id(world: &WorldModel, name: &str, entity_type: &str) -> Option<EntityId> {
+    world
+        .find_by_name(name)
+        .into_iter()
+        .find(|entity| entity.name == name && entity.entity_type == entity_type)
+        .map(|entity| entity.id)
+}
+
+fn ensure_concept_entity(world: &mut WorldModel, term: &str, confidence: f64) -> EntityId {
+    let name = format!("concept:{}", term.to_lowercase());
+    if let Some(id) = find_entity_id(world, &name, "concept") {
+        world.update_entity_property(id, "label", term.to_string());
+        world.update_entity_property(id, "confidence", confidence);
+        if let Some(entity) = world.get_entity_mut(id) {
+            entity.confidence = confidence;
+            ensure_tag(&mut entity.tags, "concept");
+            ensure_tag(&mut entity.tags, "analogy");
+        }
+        return id;
+    }
+
+    let mut entity = Entity::new("concept", &name)
+        .with_property("label", term.to_string())
+        .with_property("confidence", confidence)
+        .with_confidence(confidence)
+        .with_tag("concept")
+        .with_tag("analogy");
+    entity = entity.with_tag(term);
+    world.add_entity(entity)
+}
+
+fn add_relationship_if_missing(world: &mut WorldModel, relationship: Relationship) {
+    let exists = world
+        .get_outgoing(relationship.source)
+        .iter()
+        .any(|existing| {
+            existing.target == relationship.target
+                && existing.relation_type == relationship.relation_type
+        });
+    if !exists {
+        world.add_relationship(relationship);
+    }
+}
+
+fn ensure_tag(tags: &mut Vec<String>, tag: &str) {
+    if !tags.iter().any(|existing| existing == tag) {
+        tags.push(tag.to_string());
+    }
+}
+
 // ============================================================================
 // TESTS
 // ============================================================================
@@ -617,8 +965,9 @@ fn unique_strings(values: Vec<String>) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::core::prediction::{PredictionError, PredictionLayer};
-    use crate::core::{ActionCategory, ExpectedOutcome, Outcome, Priority};
+    use crate::core::{ActionCategory, ExpectedOutcome, ImaginationType, Outcome, Priority};
     use chrono::Utc;
+    use serde_json::json;
     use std::time::Duration;
 
     fn make_test_action(name: &str) -> ActionTemplate {
@@ -726,6 +1075,45 @@ mod tests {
         let scene = scenes[0];
         assert!(scene.get_property("modalities").is_some());
         assert!(scene.get_property("features").is_some());
+    }
+
+    #[test]
+    fn test_brain_agent_imagination_updates_world_model() {
+        let config = BrainAgentConfig {
+            agent: AgentConfig {
+                min_tick_interval: Duration::from_millis(0),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut agent = BrainAgent::with_config(config).unwrap();
+
+        let imagining = Imagining::new(
+            ImaginationType::Synthesis,
+            "Blend feedback loops with narrative recall".to_string(),
+            vec!["mem-creative".to_string()],
+        )
+        .with_confidence(0.8)
+        .with_utility(0.9)
+        .with_novelty(0.7)
+        .with_metadata("patterns", json!(["feedback loop", "resonance"]))
+        .with_metadata("domain", json!("systems"));
+
+        let imagining_id = imagining.id;
+        agent.submit_imagining(imagining);
+
+        let world = agent.world().expect("world model should be enabled");
+        let imagination_name = format!("imagination:{}", imagining_id);
+        assert!(!world.find_by_name(&imagination_name).is_empty());
+        assert!(!world.find_by_type("concept").is_empty());
+
+        agent.tick();
+
+        let world = agent.world().expect("world model should be enabled");
+        let plan_name = format!("plan:{}", imagining_id);
+        assert!(!world.find_by_name(&plan_name).is_empty());
+        assert!(!world.find_by_type("goal").is_empty());
+        assert!(!world.find_by_type("action").is_empty());
     }
 
     #[test]
