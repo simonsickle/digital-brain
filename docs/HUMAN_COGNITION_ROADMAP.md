@@ -21,9 +21,8 @@ Create a cognitive architecture indistinguishable from human cognition.
 - **Current coverage:** `src/core/inner_speech.rs` generates self-talk, rehearsal, and narrative buffers that synchronize with the DMN.
 - **Next focus:** Couple inner speech with upcoming language cortex modules for grounded verbal reasoning.
 
-### 5. Sleep & Dreams ⚠️ (iterating)
-- **Current coverage:** `src/core/sleep.rs` orchestrates multi-stage sleep, dream generation via the imagination engine, and exposes `Brain::sleep`; sleep quality now informs DMN narratives and long-horizon strategy biasing.
-- **Next focus:** Tie sleep pressure to hypothalamic drives, log dream insights, and trigger schema updates post-REM.
+### 5. Sleep & Dreams ✅
+- **Current coverage:** `src/core/sleep.rs` orchestrates multi-stage sleep, dream generation via the imagination engine, and exposes `Brain::sleep`; sleep pressure now informs hypothalamic fatigue drives, dream insights are logged, and schema updates run post-REM.
 
 ### 6. Predictive Processing ⚠️ (partial)
 - **Current coverage:** Hierarchical predictive coding now spans sensory/perceptual/conceptual layers in `src/core/prediction.rs`, with active inference proposals feeding prefrontal focus and attentional retuning via `Brain::process`.

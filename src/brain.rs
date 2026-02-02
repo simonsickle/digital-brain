@@ -652,6 +652,9 @@ impl Brain {
         // Cortisol restoration during sleep (critical for recovery)
         self.neuromodulators.cortisol.rest();
 
+        // Update hypothalamus sleep state and drives
+        self.hypothalamus.sleep(hours);
+
         let hours_factor = (hours / 8.0).clamp(0.0, 1.0);
         let consolidation_factor =
             (consolidated_count as f64 / unconsolidated.len().max(1) as f64).min(1.0);
@@ -674,11 +677,23 @@ impl Brain {
             (0.3 + sleep_quality * 0.4).clamp(0.2, 1.0),
         );
 
+        let dream_insights = self.generate_dream_insights(&unconsolidated);
+        if !dream_insights.is_empty() {
+            self.apply_sleep_schema_updates(&dream_insights);
+            for insight in &dream_insights {
+                self.dmn.narrate(
+                    format!("Dream insight: {}", insight),
+                    (0.25 + sleep_quality * 0.3).clamp(0.2, 0.9),
+                );
+            }
+        }
+
         Ok(SleepReport {
             hours_slept: hours,
             memories_forgotten: forgotten,
             memories_consolidated: consolidated_count,
             sleep_quality,
+            dream_insights,
             reflection: reflection.content,
         })
     }
@@ -900,6 +915,61 @@ impl Brain {
                 episode_id,
                 triggers,
             );
+        }
+    }
+
+    fn generate_dream_insights(&self, memories: &[MemoryTrace]) -> Vec<String> {
+        let mut candidates: Vec<_> = memories.iter().collect();
+        candidates.sort_by(|a, b| {
+            b.salience
+                .value()
+                .partial_cmp(&a.salience.value())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        let mut insights = Vec::new();
+        for memory in candidates.into_iter().take(3) {
+            let content = memory_to_string(memory);
+            if content.is_empty() {
+                continue;
+            }
+            let tokens = tokenize_content(&content);
+            if tokens.is_empty() {
+                continue;
+            }
+            let anchor = tokens
+                .first()
+                .cloned()
+                .unwrap_or_else(|| "memory".to_string());
+            let tone = if memory.valence.is_positive() {
+                "uplifting"
+            } else if memory.valence.is_negative() {
+                "unsettling"
+            } else {
+                "neutral"
+            };
+            let insight = format!("{} feels {} after rest", anchor, tone);
+            insights.push(insight);
+        }
+
+        insights
+    }
+
+    fn apply_sleep_schema_updates(&mut self, insights: &[String]) {
+        let episode_id = self.cycle_count.saturating_add(1);
+        for insight in insights {
+            let triggers = dedupe_strings(
+                tokenize_content(insight)
+                    .into_iter()
+                    .chain(vec!["sleep".to_string(), "dream".to_string()])
+                    .collect(),
+            );
+            if triggers.is_empty() {
+                continue;
+            }
+            let pattern = format!("After sleep, {}", insight);
+            self.schemas
+                .upsert_pattern(&pattern, SchemaCategory::Emotional, episode_id, triggers);
         }
     }
 
@@ -1897,6 +1967,14 @@ fn feature_triggers(feature: &str) -> Vec<String> {
     triggers
 }
 
+fn memory_to_string(memory: &MemoryTrace) -> String {
+    if let Some(text) = memory.content.as_str() {
+        text.to_string()
+    } else {
+        memory.content.to_string()
+    }
+}
+
 fn tokenize_content(content: &str) -> Vec<String> {
     content
         .split_whitespace()
@@ -1935,6 +2013,7 @@ pub struct SleepReport {
     pub memories_forgotten: usize,
     pub memories_consolidated: usize,
     pub sleep_quality: f64,
+    pub dream_insights: Vec<String>,
     pub reflection: String,
 }
 
