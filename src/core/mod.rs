@@ -13,6 +13,7 @@ pub mod inner_speech;
 pub mod llm;
 pub mod nervous_system;
 pub mod neuromodulators;
+pub mod planning;
 pub mod prediction;
 pub mod salience;
 pub mod self_model;
@@ -73,6 +74,7 @@ pub use neuromodulators::{
     OxytocinSystem, RewardCategory, RewardQuality, RewardResult, SerotoninSystem, ToleranceTracker,
     TrustLevel,
 };
+pub use planning::{ImaginationPlanner, ImaginationPlannerConfig, PlanningSuggestion};
 pub use prediction::{
     ActiveInferencePolicy, ActiveInferenceProposal, Prediction, PredictionContext,
     PredictionEngine, PredictionError, PredictionLayer, PredictionState, PredictionStats,

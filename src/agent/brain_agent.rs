@@ -25,7 +25,8 @@ use crate::agent::{
 };
 use crate::brain::{Brain, BrainConfig, ProcessingResult, SleepReport};
 use crate::core::{
-    ActionTemplate, CuriositySystem, Domain, Entity, Goal, GoalId, PropertyValue, WorldModel,
+    ActionTemplate, CuriositySystem, Domain, Entity, Goal, GoalId, Imagining, PropertyValue,
+    WorldModel,
 };
 use crate::error::Result;
 
@@ -431,6 +432,16 @@ impl BrainAgent {
     /// Perceive with feedback valence
     pub fn feedback(&mut self, positive: bool, message: &str) {
         self.agent.feedback(positive, message);
+    }
+
+    /// Submit an imagination for planning integration
+    pub fn submit_imagining(&mut self, imagining: Imagining) {
+        self.agent.submit_imagining(imagining);
+    }
+
+    /// Submit multiple imaginations for planning integration
+    pub fn submit_imaginations(&mut self, imaginings: impl IntoIterator<Item = Imagining>) {
+        self.agent.submit_imaginations(imaginings);
     }
 
     /// Run multiple cycles

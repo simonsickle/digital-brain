@@ -42,8 +42,8 @@ Create a cognitive architecture indistinguishable from human cognition.
 - **Next focus:** Close the loop with goal scheduling and episodic simulation for proactive planning.
 
 ### 10. Creativity & Imagination ⚠️ (partial)
-- **Current coverage:** `src/core/imagination.rs` recombines memories, generates counterfactuals, and fuels dream content.
-- **Next focus:** Embed imagination outputs into action selection, analogy making, and creative problem solving pipelines.
+- **Current coverage:** `src/core/imagination.rs` recombines memories, generates counterfactuals, and fuels dream content; imagination outputs now feed planning via the `ImaginationPlanner` bridge into goals/actions.
+- **Next focus:** Extend imagination-guided analogies and map creative insights into structured plans in the world model.
 
 ---
 
@@ -66,7 +66,7 @@ Create a cognitive architecture indistinguishable from human cognition.
 
 ### Phase D: Predictive & Generative Mastery
 10. ✅ Layer hierarchical predictive coding and active inference into perception/action loops (prediction context synthesis + active inference proposals).
-11. Integrate imagination outputs with planning and goal management for creative problem solving.
+11. ✅ Integrate imagination outputs with planning and goal management for creative problem solving.
 12. Instrument mood and sleep data to adapt long-horizon strategies and self-narratives.
 
 ---

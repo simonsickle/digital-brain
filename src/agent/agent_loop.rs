@@ -27,7 +27,9 @@ use uuid::Uuid;
 
 use crate::core::action::{ActionDecision, ActionId, ActionSelector, ActionTemplate, Outcome};
 use crate::core::goals::{Goal, GoalEvent, GoalId, GoalManager};
+use crate::core::imagination::Imagining;
 use crate::core::neuromodulators::NeuromodulatorState;
+use crate::core::planning::{ImaginationPlanner, PlanningSuggestion};
 use crate::signal::Valence;
 
 /// Types of percepts the agent can receive
@@ -273,6 +275,10 @@ pub struct AgentLoop {
     action_selector: ActionSelector,
     /// Goal manager
     goal_manager: GoalManager,
+    /// Imagination planner (creative → actionable)
+    imagination_planner: ImaginationPlanner,
+    /// Buffered imaginations awaiting planning
+    imagination_buffer: Vec<Imagining>,
     /// Current agent state
     state: AgentState,
     /// Percept buffer
@@ -299,6 +305,8 @@ impl AgentLoop {
         Self {
             action_selector,
             goal_manager: GoalManager::new(),
+            imagination_planner: ImaginationPlanner::default(),
+            imagination_buffer: Vec::new(),
             state: AgentState::default(),
             percept_buffer: Vec::new(),
             config,
@@ -355,6 +363,18 @@ impl AgentLoop {
         id
     }
 
+    /// Submit an imagining for planning integration
+    pub fn submit_imagining(&mut self, imagining: Imagining) {
+        self.imagination_buffer.push(imagining);
+    }
+
+    /// Submit multiple imaginings for planning integration
+    pub fn submit_imaginations(&mut self, imaginings: impl IntoIterator<Item = Imagining>) {
+        for imagining in imaginings {
+            self.submit_imagining(imagining);
+        }
+    }
+
     /// Decompose a goal into subgoals
     pub fn decompose_goal(&mut self, goal_id: GoalId, subgoals: Vec<Goal>) -> Vec<GoalId> {
         self.goal_manager.decompose(goal_id, subgoals)
@@ -407,6 +427,9 @@ impl AgentLoop {
 
         // 1. Process percepts
         let percepts_processed = self.process_percepts(&mut outputs);
+
+        // 1.5 Integrate imagination-driven plans
+        self.process_imaginations(&mut outputs);
 
         // 2. Check goals
         self.update_active_goals();
@@ -536,6 +559,73 @@ impl AgentLoop {
         }
 
         count
+    }
+
+    fn process_imaginations(&mut self, outputs: &mut Vec<AgentOutput>) {
+        if self.imagination_buffer.is_empty() {
+            return;
+        }
+
+        let imaginings: Vec<_> = self.imagination_buffer.drain(..).collect();
+
+        for imagining in imaginings {
+            let suggestion = self.imagination_planner.plan_from_imagining(&imagining);
+            if suggestion.is_empty() {
+                continue;
+            }
+
+            let (goals_added, actions_added) = self.apply_planning_suggestion(&suggestion);
+
+            if self.config.debug && (goals_added > 0 || actions_added > 0) {
+                outputs.push(AgentOutput {
+                    output_type: OutputType::Status,
+                    content: format!(
+                        "Imagination plan added {} goals and {} actions ({})",
+                        goals_added, actions_added, suggestion.rationale
+                    ),
+                    target: None,
+                    urgency: (suggestion.score * 0.6).clamp(0.1, 1.0),
+                    valence: Valence::new(0.2),
+                });
+            }
+        }
+    }
+
+    fn apply_planning_suggestion(&mut self, suggestion: &PlanningSuggestion) -> (usize, usize) {
+        let mut goals_added = 0;
+        let mut actions_added = 0;
+
+        for goal in &suggestion.goals {
+            if !self.has_similar_goal(&goal.description) {
+                self.goal_manager.add(goal.clone());
+                goals_added += 1;
+            }
+        }
+
+        for action in &suggestion.actions {
+            if !self.has_similar_action(&action.name) {
+                self.action_selector.register_action(action.clone());
+                actions_added += 1;
+            }
+        }
+
+        (goals_added, actions_added)
+    }
+
+    fn has_similar_goal(&self, description: &str) -> bool {
+        let target = normalize_label(description);
+        self.goal_manager.all_goals().any(|goal| {
+            let existing = normalize_label(&goal.description);
+            existing.contains(&target) || target.contains(&existing)
+        })
+    }
+
+    fn has_similar_action(&self, name: &str) -> bool {
+        let target = normalize_label(name);
+        self.action_selector.actions().iter().any(|action| {
+            let existing = normalize_label(&action.name);
+            existing == target
+        })
     }
 
     /// Update the list of active goal descriptions
@@ -740,6 +830,14 @@ impl AgentLoop {
     }
 }
 
+fn normalize_label(label: &str) -> String {
+    label
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .collect()
+}
+
 // Default neuromodulator state
 impl Default for NeuromodulatorState {
     fn default() -> Self {
@@ -780,6 +878,8 @@ mod tests {
     use super::*;
     use crate::core::action::{ActionCategory, ExpectedOutcome};
     use crate::core::goals::Priority;
+    use crate::core::imagination::{ImaginationType, Imagining};
+    use std::time::Duration;
 
     fn make_test_action(name: &str) -> ActionTemplate {
         ActionTemplate {
@@ -796,6 +896,29 @@ mod tests {
             category: ActionCategory::Exploration,
             tags: vec![],
         }
+    }
+
+    #[test]
+    fn test_imagination_creates_goal_and_action() {
+        let config = AgentConfig {
+            min_tick_interval: Duration::from_millis(0),
+            ..Default::default()
+        };
+        let mut agent = AgentLoop::new(config);
+        let imagining = Imagining::new(
+            ImaginationType::Hypothesis,
+            "If we prioritize the cache, latency drops".to_string(),
+            vec!["mem-42".to_string()],
+        )
+        .with_confidence(0.7)
+        .with_utility(0.8)
+        .with_novelty(0.4);
+
+        agent.submit_imagining(imagining);
+        agent.tick();
+
+        assert!(agent.goals().all_goals().count() >= 1);
+        assert!(!agent.actions().actions().is_empty());
     }
 
     #[test]
