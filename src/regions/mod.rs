@@ -20,11 +20,13 @@
 //! - **brainstem**: Autonomic control and bodily feedback
 //! - **language_cortex**: Linguistic comprehension and inner speech grounding
 //! - **temporal_cortex**: Semantic association and meaning integration
+//! - **broca**: Speech planning and language production
 
 pub mod acc;
 pub mod amygdala;
 pub mod basal_ganglia;
 pub mod brainstem;
+pub mod broca;
 pub mod cerebellum;
 pub mod dmn;
 pub mod hippocampus;
@@ -44,6 +46,7 @@ pub mod thalamus;
 pub use acc::{ACC, Conflict, ControlSignal, Error, ErrorType};
 pub use basal_ganglia::{ActionPattern, BasalGanglia, GateDecision, SelectionResult};
 pub use brainstem::{AutonomicFeedback, Brainstem, BrainstemConfig};
+pub use broca::{BrocaArea, BrocaConfig, BrocaStats, SpeechIntent, SpeechPlan};
 pub use cerebellum::{
     Cerebellum, ForwardModel, MotorImagery, Procedure, ProcedureStep, TimingPrediction,
 };

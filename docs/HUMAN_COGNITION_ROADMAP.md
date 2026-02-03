@@ -19,7 +19,7 @@ Create a cognitive architecture indistinguishable from human cognition.
 
 ### 4. Inner Speech & Narrative ✅
 - **Current coverage:** `src/core/inner_speech.rs` generates self-talk, rehearsal, and narrative buffers that synchronize with the DMN.
-- **Implemented:** A language cortex now grounds inner speech and external language into semantic representations that feed working memory and the global workspace.
+- **Implemented:** A language cortex now grounds inner speech and external language into semantic representations that feed working memory and the global workspace; the Broca area converts salient inner speech and semantic insights into speech plans for externalization.
 
 ### 5. Sleep & Dreams ✅
 - **Current coverage:** `src/core/sleep.rs` orchestrates multi-stage sleep, dream generation via the imagination engine, and exposes `Brain::sleep`; sleep pressure now informs hypothalamic fatigue drives, dream insights are logged, and schema updates run post-REM.

@@ -2,7 +2,7 @@
 
 **An elegant, modular simulation of consciousness — built by AI agents collaborating.**
 
-[![Tests](https://img.shields.io/badge/tests-349%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-353%20passing-brightgreen)]()
 [![Rust](https://img.shields.io/badge/rust-1.93+-orange)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
@@ -45,6 +45,8 @@ fn main() -> digital_brain::Result<()> {
     Ok(())
 }
 ```
+
+Need onboarding details (identity, memory persistence, demos)? See `docs/ONBOARDING.md`.
 
 ## Full Agent System (NEW!)
 
@@ -117,6 +119,7 @@ full signal flow documentation.
 | `DMN` | Default Mode Network | Self-model | Identity, beliefs, reflection, theory of mind |
 | `LanguageCortex` | Language cortex | Linguistic grounding | Intent + sentiment + semantic features |
 | `TemporalCortex` | Temporal cortex | Semantic association | Concept graph + insights |
+| `BrocaArea` | Broca area | Speech planning | Inner speech → utterance planning |
 | `PredictionEngine` | Dopamine system | Learning | Surprise detection, learning rate modulation |
 | `GlobalWorkspace` | Consciousness | Integration | Salience competition, broadcast mechanism |
 

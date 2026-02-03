@@ -14,6 +14,7 @@ graph LR
     Workspace((Workspace))
     Language((Language Cortex))
     Temporal((Temporal Cortex))
+    Broca((Broca Area))
     PPC((Posterior Parietal))
     Motor((Motor Cortex))
     Basal((Basal Ganglia))
@@ -27,9 +28,11 @@ graph LR
     PPC --> Workspace
     Amygdala --> Workspace
     Language --> Temporal
+    Temporal --> Broca
     Language --> Prefrontal
     Temporal --> Prefrontal
     Temporal --> DMN
+    Broca --> Workspace
     Workspace --> Prefrontal
     Workspace --> Hippocampus
     Prefrontal --> Basal
@@ -49,6 +52,7 @@ graph LR
 | Posterior Parietal | Sensory | Multimodal binding |
 | Language Cortex | Sensory, Memory | Linguistic grounding |
 | Temporal Cortex | Memory | Semantic association |
+| Broca Area | Motor, Broadcast | Speech planning + externalization |
 | Prefrontal | Memory, Attention | Working memory + executive control |
 | Workspace | Broadcast | Conscious access |
 | Hippocampus | Memory | Encoding + consolidation |
@@ -68,6 +72,7 @@ sequenceDiagram
     participant Amygdala
     participant Language
     participant Temporal
+    participant Broca
     participant Workspace
     participant Prefrontal
     participant Hippocampus
@@ -78,6 +83,8 @@ sequenceDiagram
     Language->>Temporal: Semantic association
     Amygdala->>Workspace: Salience boost
     Temporal->>Workspace: Semantic insight
+    Temporal->>Broca: Insight + salience
+    Broca->>Workspace: Speech plan broadcast
     Workspace->>Prefrontal: Working memory update
     Workspace->>Hippocampus: Memory encoding
 ```

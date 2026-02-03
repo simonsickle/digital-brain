@@ -108,6 +108,20 @@ Features:
 
 ---
 
+### Broca Area (Speech Planning)
+**Status:** ✅ Complete
+**Location:** `src/regions/broca.rs`
+
+Transforms inner speech and semantic insights into planned utterances.
+
+Features:
+- Speech intent classification
+- Urgency and emotional tone scoring
+- Insight-to-utterance bridging
+- Communication pipeline integration
+
+---
+
 ## Core Systems (All Implemented ✅)
 
 ### Prediction Engine

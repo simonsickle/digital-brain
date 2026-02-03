@@ -32,6 +32,7 @@ use crate::core::{
     StrategySignal, WorldModel,
 };
 use crate::error::Result;
+use crate::regions::SpeechIntent;
 
 /// Configuration for the brain-agent
 #[derive(Debug, Clone)]
@@ -262,7 +263,31 @@ impl BrainAgent {
         self.stats.total_inputs_processed += 1;
         self.update_world_model_from_processing(input, &result);
         self.sync_neuromodulators_from_brain();
+        self.queue_speech_plans_from_brain();
         Ok(result)
+    }
+
+    fn queue_speech_plans_from_brain(&mut self) {
+        let Some(comm) = &mut self.comm else {
+            return;
+        };
+
+        for plan in self.brain.drain_speech_plans() {
+            let intent_type = match plan.intent {
+                SpeechIntent::Inform => IntentType::Inform,
+                SpeechIntent::Question => IntentType::Clarify,
+                SpeechIntent::Request => IntentType::Request,
+                SpeechIntent::Command => IntentType::Request,
+                SpeechIntent::Reflection => IntentType::Express,
+            };
+            let intent = crate::agent::CommunicationIntent::new(&plan.content, intent_type)
+                .with_urgency(plan.urgency)
+                .with_valence(plan.emotional_tone)
+                .with_context(plan.intent.as_intent_label())
+                .with_context(&plan.source)
+                .with_priority(plan.urgency);
+            comm.queue(intent);
+        }
     }
 
     fn update_world_model_from_processing(&mut self, input: &str, result: &ProcessingResult) {
@@ -641,6 +666,8 @@ impl BrainAgent {
             outputs.push(output.content.clone());
         }
 
+        self.queue_speech_plans_from_brain();
+
         // Check for communication outputs
         if let Some(comm) = &mut self.comm {
             while let Some(intent) = comm.next_to_send() {
@@ -679,6 +706,7 @@ impl BrainAgent {
         if let Ok(result) = self.brain.process(input) {
             self.update_world_model_from_processing(input, &result);
             self.sync_neuromodulators_from_brain();
+            self.queue_speech_plans_from_brain();
         }
         self.stats.total_inputs_processed += 1;
         self.update_strategy_from_state("perception");
@@ -1162,6 +1190,21 @@ mod tests {
         agent.request("Can you help?");
 
         assert_eq!(agent.comm().unwrap().pending().len(), 2);
+    }
+
+    #[test]
+    fn test_brain_agent_speech_plans_queue_comm() {
+        let mut agent = BrainAgent::new().unwrap();
+        let utterance = crate::core::InnerUtterance::new(
+            "We should act now",
+            crate::core::InnerSpeechType::SelfInstruction,
+        )
+        .with_intensity(0.9);
+
+        agent.brain_mut().submit_inner_utterance(utterance);
+        agent.queue_speech_plans_from_brain();
+
+        assert!(!agent.comm().unwrap().pending().is_empty());
     }
 
     #[test]

@@ -51,6 +51,7 @@ pub enum BrainRegion {
     OlfactoryCortex,
     LanguageCortex,
     TemporalCortex,
+    Broca,
     PosteriorParietal,
     MotorCortex,
     Brainstem,
@@ -80,6 +81,7 @@ impl BrainRegion {
             BrainRegion::OlfactoryCortex => "OlfactoryCortex",
             BrainRegion::LanguageCortex => "LanguageCortex",
             BrainRegion::TemporalCortex => "TemporalCortex",
+            BrainRegion::Broca => "Broca",
             BrainRegion::PosteriorParietal => "PosteriorParietal",
             BrainRegion::MotorCortex => "MotorCortex",
             BrainRegion::Brainstem => "Brainstem",
@@ -291,6 +293,22 @@ impl NervousSystem {
             )
             .with_signal_types(vec![SignalType::Memory, SignalType::Sensory]),
         );
+        self.add_pathway(
+            Pathway::new(BrainRegion::TemporalCortex, BrainRegion::Broca, 0.7)
+                .with_signal_types(vec![SignalType::Memory, SignalType::Attention]),
+        );
+        self.add_pathway(
+            Pathway::new(BrainRegion::Prefrontal, BrainRegion::Broca, 0.7)
+                .with_signal_types(vec![SignalType::Memory, SignalType::Attention]),
+        );
+        self.add_pathway(
+            Pathway::new(BrainRegion::Broca, BrainRegion::Workspace, 0.7)
+                .with_signal_types(vec![SignalType::Broadcast]),
+        );
+        self.add_pathway(
+            Pathway::new(BrainRegion::Broca, BrainRegion::External, 0.8)
+                .with_signal_types(vec![SignalType::Motor]),
+        );
 
         // Thalamus → Posterior Parietal (multimodal integration gateway)
         self.add_pathway(Pathway::new(
@@ -448,6 +466,7 @@ impl NervousSystem {
             BrainRegion::Insula,
             BrainRegion::LanguageCortex,
             BrainRegion::TemporalCortex,
+            BrainRegion::Broca,
         ] {
             self.add_pathway(
                 Pathway::new(BrainRegion::Workspace, region, 1.0)
@@ -503,6 +522,7 @@ impl NervousSystem {
             BrainRegion::OlfactoryCortex,
             BrainRegion::LanguageCortex,
             BrainRegion::TemporalCortex,
+            BrainRegion::Broca,
             BrainRegion::PosteriorParietal,
             BrainRegion::MotorCortex,
             BrainRegion::Brainstem,

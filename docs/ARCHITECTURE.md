@@ -19,13 +19,16 @@ flowchart TD
     Thalamus --> PPC[Posterior Parietal\nMultimodal Binding]
     Thalamus --> Language[Language Cortex\nIntent + Semantics]
     Language --> Temporal[Temporal Cortex\nSemantic Associations]
+    Temporal --> Broca[Broca Area\nSpeech Planning]
     Amygdala --> Workspace[Global Workspace\nConscious Broadcast]
     PPC --> Workspace
     Language --> Workspace
     Temporal --> Workspace
+    Broca --> Workspace
     Workspace --> Prefrontal[Prefrontal\nWorking Memory]
     Workspace --> Hippocampus[Hippocampus\nMemory Encoding]
     Prefrontal --> Actions[Action Selection\nBasal Ganglia + Motor Cortex]
+    Broca --> Speech[Speech Output\nExternalization]
     Hippocampus --> Sleep[Sleep + Consolidation]
 ```
 
@@ -36,6 +39,7 @@ sequenceDiagram
     participant Thalamus
     participant LanguageCortex
     participant TemporalCortex
+    participant Broca
     participant Prefrontal
     participant Workspace
     participant DMN
@@ -46,6 +50,8 @@ sequenceDiagram
     TemporalCortex->>Prefrontal: Semantic insight
     TemporalCortex->>Workspace: High-confidence insight
     TemporalCortex->>DMN: Narrative reinforcement
+    TemporalCortex->>Broca: Insight + salience
+    Broca->>Workspace: Speech plan broadcast
 ```
 
 ## Module Interfaces

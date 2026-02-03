@@ -24,6 +24,7 @@ use crate::regions::acc::{ACC, ControlSignal};
 use crate::regions::amygdala::{Amygdala, Emotion, EmotionalAppraisal};
 use crate::regions::basal_ganglia::{ActionPattern, BasalGanglia, GateDecision};
 use crate::regions::brainstem::{AutonomicFeedback, Brainstem};
+use crate::regions::broca::{BrocaArea, SpeechIntent, SpeechPlan};
 use crate::regions::cerebellum::{Cerebellum, Procedure};
 use crate::regions::dmn::{
     Belief, BeliefCategory, DefaultModeNetwork, Identity, ReflectionTrigger,
@@ -44,6 +45,7 @@ use crate::regions::stn::{STN, StopReason, StopSignal, TaskConfig, TaskId};
 use crate::regions::temporal_cortex::{SemanticInsight, TemporalCortex};
 use crate::regions::thalamus::{Destination, Thalamus};
 use crate::signal::{BrainSignal, MemoryTrace, Salience, SignalType};
+use std::collections::VecDeque;
 
 /// Configuration for the complete brain.
 #[derive(Debug, Clone)]
@@ -163,6 +165,8 @@ pub struct Brain {
     pub inner_speech: InnerSpeechSystem,
     /// Temporal cortex semantic association
     pub temporal_cortex: TemporalCortex,
+    /// Broca area speech planning
+    pub broca: BrocaArea,
     /// Neuromodulatory system (dopamine, serotonin, norepinephrine, acetylcholine)
     pub neuromodulators: NeuromodulatorySystem,
     /// Nervous system (inter-module signal routing)
@@ -183,6 +187,8 @@ pub struct Brain {
     pub cerebellum: Cerebellum,
     /// Response inhibition and task watchdog
     pub stn: STN,
+    /// Pending speech plans for externalization
+    speech_queue: VecDeque<SpeechPlan>,
     /// Processing cycle count
     cycle_count: u64,
     /// Last interoceptive alert summary (for throttling)
@@ -239,6 +245,7 @@ impl Brain {
             language_cortex: LanguageCortex::new(),
             inner_speech: InnerSpeechSystem::new(),
             temporal_cortex: TemporalCortex::new(),
+            broca: BrocaArea::new(),
             neuromodulators: NeuromodulatorySystem::new(),
             nervous_system: NervousSystem::new(),
             schemas: SchemaStore::new(),
@@ -249,6 +256,7 @@ impl Brain {
             acc: ACC::new(),
             cerebellum: Cerebellum::new(),
             stn: STN::new(),
+            speech_queue: VecDeque::new(),
             cycle_count: 0,
             last_interoceptive_alert: None,
             last_interoceptive_alert_cycle: 0,
@@ -1359,6 +1367,11 @@ impl Brain {
         }
     }
 
+    /// Submit a custom inner utterance for routing.
+    pub fn submit_inner_utterance(&mut self, utterance: InnerUtterance) {
+        self.route_inner_speech(utterance);
+    }
+
     fn route_inner_speech(&mut self, utterance: InnerUtterance) {
         let representation = self.language_cortex.process_inner_speech(&utterance);
         let mut language_signal = representation.to_signal();
@@ -1374,11 +1387,18 @@ impl Brain {
             "inner_speech_emotional_tone".to_string(),
             serde_json::Value::from(utterance.emotional_tone),
         );
-        if let Some(context) = utterance.context {
+        if let Some(ref context) = utterance.context {
             language_signal.metadata.insert(
                 "inner_speech_context".to_string(),
-                serde_json::Value::String(context),
+                serde_json::Value::String(context.clone()),
             );
+        }
+
+        if let Some(plan) = self
+            .broca
+            .plan_from_inner_speech(&utterance, representation.salience)
+        {
+            self.queue_speech_plan(plan);
         }
 
         self.nervous_system.transmit(
@@ -1403,6 +1423,9 @@ impl Brain {
     }
 
     fn route_semantic_insight(&mut self, insight: &SemanticInsight) {
+        if let Some(plan) = self.broca.plan_from_insight(insight) {
+            self.queue_speech_plan(plan);
+        }
         let signal = insight.to_signal();
         self.nervous_system.transmit(
             BrainRegion::TemporalCortex,
@@ -1422,6 +1445,31 @@ impl Brain {
 
         self.nervous_system
             .transmit(BrainRegion::TemporalCortex, BrainRegion::DMN, signal);
+    }
+
+    fn queue_speech_plan(&mut self, plan: SpeechPlan) {
+        let should_broadcast = plan.urgency >= 0.6
+            || matches!(plan.intent, SpeechIntent::Question | SpeechIntent::Command);
+
+        self.speech_queue.push_back(plan.clone());
+
+        let motor_signal = plan.to_signal();
+        self.nervous_system.transmit(
+            BrainRegion::Broca,
+            BrainRegion::External,
+            motor_signal.clone(),
+        );
+
+        if should_broadcast {
+            let mut broadcast_signal = motor_signal.clone();
+            broadcast_signal.signal_type = SignalType::Broadcast;
+            self.nervous_system.transmit(
+                BrainRegion::Broca,
+                BrainRegion::Workspace,
+                broadcast_signal.clone(),
+            );
+            self.workspace.submit(broadcast_signal);
+        }
     }
 
     fn generate_dream_insights(&self, memories: &[MemoryTrace]) -> Vec<String> {
@@ -1973,6 +2021,11 @@ impl Brain {
     /// Get working memory contents.
     pub fn working_memory(&self) -> Vec<&crate::regions::prefrontal::WorkingMemoryItem> {
         self.prefrontal.contents()
+    }
+
+    /// Drain queued speech plans for externalization.
+    pub fn drain_speech_plans(&mut self) -> Vec<SpeechPlan> {
+        self.speech_queue.drain(..).collect()
     }
 
     /// Get comprehensive brain statistics.
@@ -2717,6 +2770,22 @@ mod tests {
         let _ = brain.reflect("planning");
 
         assert!(brain.language_cortex.stats().total_inner_utterances > 0);
+    }
+
+    #[test]
+    fn test_inner_speech_generates_speech_plan() {
+        let mut brain = Brain::new().unwrap();
+        let utterance = InnerUtterance::new(
+            "We should act now",
+            crate::core::inner_speech::InnerSpeechType::SelfInstruction,
+        )
+        .with_intensity(0.9);
+
+        brain.submit_inner_utterance(utterance);
+
+        let plans = brain.drain_speech_plans();
+        assert!(!plans.is_empty());
+        assert_eq!(plans[0].intent, SpeechIntent::Command);
     }
 
     #[test]
