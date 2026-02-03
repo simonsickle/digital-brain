@@ -16,6 +16,7 @@ pub mod neuromodulators;
 pub mod planning;
 pub mod prediction;
 pub mod salience;
+pub mod scheduler;
 pub mod self_model;
 pub mod sensory;
 pub mod sleep;
@@ -81,6 +82,10 @@ pub use prediction::{
     PredictionEngine, PredictionError, PredictionLayer, PredictionState, PredictionStats,
 };
 pub use salience::{SalienceInputs, SalienceNetwork, SalienceOutcome};
+pub use scheduler::{
+    EventCallback, PersistentScheduler, ScheduledTask, SchedulerConfig, SchedulerStats,
+    SchedulingPolicy, SubscriptionId, TaskEvent, TaskId, TaskPriority, TaskScheduler, TaskState,
+};
 pub use self_model::{
     AutobiographicalSelf, LifeChapter, LifeEvent, MetacognitiveMonitor, MetacognitiveState,
     SelfConcept, SelfModel, SelfTrait, Value,
