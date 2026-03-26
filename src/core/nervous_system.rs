@@ -64,8 +64,10 @@ pub enum BrainRegion {
     BasalGanglia,
     ACC,
     Cerebellum,
-    STN,      // Subthalamic Nucleus - response inhibition
-    External, // Input/output to outside world
+    STN,          // Subthalamic Nucleus - response inhibition
+    DLPFC,        // Dorsolateral prefrontal cortex - cognitive flexibility
+    MirrorSystem, // Mirror neuron system - action understanding & empathy
+    External,     // Input/output to outside world
 }
 
 impl BrainRegion {
@@ -95,6 +97,8 @@ impl BrainRegion {
             BrainRegion::ACC => "ACC",
             BrainRegion::Cerebellum => "Cerebellum",
             BrainRegion::STN => "STN",
+            BrainRegion::DLPFC => "DLPFC",
+            BrainRegion::MirrorSystem => "MirrorSystem",
             BrainRegion::External => "External",
         }
     }
@@ -467,6 +471,8 @@ impl NervousSystem {
             BrainRegion::LanguageCortex,
             BrainRegion::TemporalCortex,
             BrainRegion::Broca,
+            BrainRegion::DLPFC,
+            BrainRegion::MirrorSystem,
         ] {
             self.add_pathway(
                 Pathway::new(BrainRegion::Workspace, region, 1.0)
@@ -508,6 +514,53 @@ impl NervousSystem {
             Pathway::new(BrainRegion::Prefrontal, BrainRegion::External, 0.9)
                 .with_signal_types(vec![SignalType::Motor]),
         );
+
+        // --- DLPFC (Cognitive Flexibility) ---
+        // Prefrontal ↔ DLPFC (executive control coordination)
+        self.add_pathway(
+            Pathway::new(BrainRegion::Prefrontal, BrainRegion::DLPFC, 0.85).bidirectional(),
+        );
+        // ACC → DLPFC (conflict signals trigger cognitive control)
+        self.add_pathway(
+            Pathway::new(BrainRegion::ACC, BrainRegion::DLPFC, 0.8)
+                .with_signal_types(vec![SignalType::Attention, SignalType::Error]),
+        );
+        // DLPFC → BasalGanglia (rule-based action selection)
+        self.add_pathway(
+            Pathway::new(BrainRegion::DLPFC, BrainRegion::BasalGanglia, 0.7)
+                .with_signal_types(vec![SignalType::Motor, SignalType::Attention]),
+        );
+        // DLPFC → Workspace (cognitive control enters consciousness)
+        self.add_pathway(
+            Pathway::new(BrainRegion::DLPFC, BrainRegion::Workspace, 0.7)
+                .with_signal_types(vec![SignalType::Attention, SignalType::Broadcast]),
+        );
+
+        // --- Mirror Neuron System ---
+        // Sensory/Motor → MirrorSystem (observed actions activate motor representations)
+        self.add_pathway(
+            Pathway::new(BrainRegion::VisualCortex, BrainRegion::MirrorSystem, 0.75)
+                .with_signal_types(vec![SignalType::Sensory]),
+        );
+        self.add_pathway(
+            Pathway::new(BrainRegion::MotorCortex, BrainRegion::MirrorSystem, 0.8)
+                .with_signal_types(vec![SignalType::Motor]),
+        );
+        // MirrorSystem → Insula (empathic resonance feeds interoception)
+        self.add_pathway(
+            Pathway::new(BrainRegion::MirrorSystem, BrainRegion::Insula, 0.7)
+                .with_signal_types(vec![SignalType::Emotion]),
+        );
+        // MirrorSystem → Amygdala (emotional mirroring)
+        self.add_pathway(
+            Pathway::new(BrainRegion::MirrorSystem, BrainRegion::Amygdala, 0.6)
+                .with_signal_types(vec![SignalType::Emotion]),
+        );
+        // MirrorSystem → Prefrontal (action understanding informs reasoning)
+        self.add_pathway(
+            Pathway::new(BrainRegion::MirrorSystem, BrainRegion::Prefrontal, 0.65)
+                .with_signal_types(vec![SignalType::Sensory, SignalType::Prediction]),
+        );
     }
 
     fn initialize_queues(&mut self) {
@@ -532,6 +585,8 @@ impl NervousSystem {
             BrainRegion::DMN,
             BrainRegion::Workspace,
             BrainRegion::PredictionEngine,
+            BrainRegion::DLPFC,
+            BrainRegion::MirrorSystem,
             BrainRegion::External,
         ] {
             self.signal_queues.insert(region, VecDeque::new());

@@ -12,6 +12,7 @@ use crate::core::nervous_system::{BrainRegion, NervousSystem, NervousSystemStats
 use crate::core::neuromodulators::{
     NeuromodulatorState, NeuromodulatorySystem, RewardCategory, RewardQuality,
 };
+use crate::core::plasticity::PlasticityEngine;
 use crate::core::prediction::{
     ActiveInferencePolicy, ActiveInferenceProposal, Prediction, PredictionContext,
     PredictionEngine, PredictionError,
@@ -26,6 +27,7 @@ use crate::regions::basal_ganglia::{ActionPattern, BasalGanglia, GateDecision};
 use crate::regions::brainstem::{AutonomicFeedback, Brainstem};
 use crate::regions::broca::{BrocaArea, SpeechIntent, SpeechPlan};
 use crate::regions::cerebellum::{Cerebellum, Procedure};
+use crate::regions::dlpfc::DLPFC;
 use crate::regions::dmn::{
     Belief, BeliefCategory, DefaultModeNetwork, Identity, ReflectionTrigger,
 };
@@ -33,6 +35,7 @@ use crate::regions::hippocampus::HippocampusStore;
 use crate::regions::hypothalamus::{DriveType, Hypothalamus};
 use crate::regions::insula::Insula;
 use crate::regions::language_cortex::{LanguageCortex, LanguageIntent, LanguageRepresentation};
+use crate::regions::mirror_system::MirrorSystem;
 use crate::regions::motor_cortex::{MotorCommand, MotorCortex};
 use crate::regions::posterior_parietal::{MultimodalContext, PosteriorParietalCortex};
 use crate::regions::prefrontal::{PrefrontalConfig, PrefrontalCortex};
@@ -187,6 +190,12 @@ pub struct Brain {
     pub cerebellum: Cerebellum,
     /// Response inhibition and task watchdog
     pub stn: STN,
+    /// Cognitive flexibility (task switching, rule learning, set shifting)
+    pub dlpfc: DLPFC,
+    /// Mirror neuron system (action understanding, empathy, imitation)
+    pub mirror_system: MirrorSystem,
+    /// Neuroplasticity (Hebbian learning, LTP/LTD, homeostatic regulation)
+    pub plasticity: PlasticityEngine,
     /// Pending speech plans for externalization
     speech_queue: VecDeque<SpeechPlan>,
     /// Processing cycle count
@@ -256,6 +265,22 @@ impl Brain {
             acc: ACC::new(),
             cerebellum: Cerebellum::new(),
             stn: STN::new(),
+            dlpfc: DLPFC::new(),
+            mirror_system: MirrorSystem::new(),
+            plasticity: {
+                let mut p = PlasticityEngine::new();
+                // Register key pathways for plasticity tracking
+                p.register_pathway(BrainRegion::Thalamus, BrainRegion::Amygdala, 0.9);
+                p.register_pathway(BrainRegion::Amygdala, BrainRegion::Hippocampus, 0.85);
+                p.register_pathway(BrainRegion::Hippocampus, BrainRegion::Prefrontal, 0.75);
+                p.register_pathway(BrainRegion::Prefrontal, BrainRegion::Workspace, 0.85);
+                p.register_pathway(BrainRegion::Thalamus, BrainRegion::Prefrontal, 0.8);
+                p.register_pathway(BrainRegion::Amygdala, BrainRegion::Workspace, 0.8);
+                p.register_pathway(BrainRegion::PredictionEngine, BrainRegion::Hippocampus, 0.8);
+                p.register_pathway(BrainRegion::Prefrontal, BrainRegion::DLPFC, 0.85);
+                p.register_pathway(BrainRegion::ACC, BrainRegion::DLPFC, 0.8);
+                p
+            },
             speech_queue: VecDeque::new(),
             cycle_count: 0,
             last_interoceptive_alert: None,
@@ -698,6 +723,40 @@ impl Brain {
         // 10. Neuromodulatory system homeostatic update
         self.neuromodulators.update();
         self.update_autonomic_cycle();
+
+        // 11. Cognitive flexibility cycle (dlPFC)
+        self.dlpfc.cycle();
+
+        // 12. Neuroplasticity: record activations and apply learning
+        self.plasticity.record_activation(
+            BrainRegion::Thalamus,
+            tagged_signal.salience.value(),
+            "process_cycle",
+        );
+        if emotion.is_significant {
+            self.plasticity.record_activation(
+                BrainRegion::Amygdala,
+                emotion.arousal.value(),
+                "emotion",
+            );
+        }
+        if reached_consciousness {
+            self.plasticity
+                .record_activation(BrainRegion::Workspace, 1.0, "broadcast");
+        }
+        if memory.is_some() {
+            self.plasticity
+                .record_activation(BrainRegion::Hippocampus, 0.8, "encoding");
+        }
+        // Apply plasticity updates every 10 cycles
+        if self.cycle_count.is_multiple_of(10) {
+            let updates = self.plasticity.compute_updates();
+            for update in &updates {
+                self.nervous_system
+                    .apply_modulation(update.from, update.to, 1.0 + update.delta);
+                self.plasticity.apply_update(update);
+            }
+        }
 
         self.cycle_count += 1;
 
