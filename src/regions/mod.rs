@@ -28,11 +28,13 @@ pub mod basal_ganglia;
 pub mod brainstem;
 pub mod broca;
 pub mod cerebellum;
+pub mod dlpfc;
 pub mod dmn;
 pub mod hippocampus;
 pub mod hypothalamus;
 pub mod insula;
 pub mod language_cortex;
+pub mod mirror_system;
 pub mod motor_cortex;
 pub mod posterior_parietal;
 pub mod prefrontal;
@@ -50,6 +52,10 @@ pub use broca::{BrocaArea, BrocaConfig, BrocaStats, SpeechIntent, SpeechPlan};
 pub use cerebellum::{
     Cerebellum, ForwardModel, MotorImagery, Procedure, ProcedureStep, TimingPrediction,
 };
+pub use dlpfc::{
+    CognitiveRule, DLPFC, DlpfcConfig, DlpfcStats, InhibitionOutcome, SetShiftResult, TaskSet,
+};
+
 pub use hypothalamus::{
     CircadianPhase, CircadianRhythm, DriveState, DriveType, Hypothalamus, HypothalamusConfig,
     HypothalamusStats, MotivationSummary, StressResponse,
@@ -61,6 +67,10 @@ pub use insula::{
 pub use language_cortex::{
     LanguageCortex, LanguageCortexConfig, LanguageIntent, LanguageOrigin, LanguageRepresentation,
     LanguageStats,
+};
+pub use mirror_system::{
+    ActionUnderstanding, EmpathicResonance, ImitationResult, MirrorSystem, MirrorSystemConfig,
+    MirrorSystemStats, ObservedAction,
 };
 pub use motor_cortex::{MotorCommand, MotorCortex, MotorStep};
 pub use posterior_parietal::{MultimodalContext, PosteriorParietalCortex};

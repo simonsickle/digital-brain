@@ -14,6 +14,7 @@ pub mod llm;
 pub mod nervous_system;
 pub mod neuromodulators;
 pub mod planning;
+pub mod plasticity;
 pub mod prediction;
 pub mod salience;
 pub mod scheduler;
@@ -77,6 +78,10 @@ pub use neuromodulators::{
     TrustLevel,
 };
 pub use planning::{ImaginationPlanner, ImaginationPlannerConfig, PlanningSuggestion};
+pub use plasticity::{
+    ActivationEvent, PlasticityConfig, PlasticityEngine, PlasticityMechanism, PlasticityStats,
+    PlasticityUpdate,
+};
 pub use prediction::{
     ActiveInferencePolicy, ActiveInferenceProposal, Prediction, PredictionContext,
     PredictionEngine, PredictionError, PredictionLayer, PredictionState, PredictionStats,
