@@ -144,6 +144,24 @@ pub enum SignalType {
     Query,
     /// Action intention
     Motor,
+    /// Inhibitory control signal (GABA-mediated suppression)
+    Inhibition,
+    /// Regulatory signal (emotion regulation, homeostatic adjustment)
+    Regulation,
+    /// Social cognition signal (theory of mind, empathy)
+    Social,
+    /// Language representation (semantic, syntactic, pragmatic)
+    Language,
+    /// Interoceptive signal (body state awareness)
+    Interoceptive,
+    /// Drive/motivational signal (hunger, curiosity, fatigue)
+    Drive,
+    /// Reward signal (dopaminergic value encoding)
+    Reward,
+    /// Spatial/contextual signal (entorhinal grid/place encoding)
+    Spatial,
+    /// Value evaluation signal (orbitofrontal outcome assessment)
+    Evaluation,
 }
 
 /// Universal signal format for brain module communication.

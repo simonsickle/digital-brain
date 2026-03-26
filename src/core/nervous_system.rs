@@ -64,10 +64,13 @@ pub enum BrainRegion {
     BasalGanglia,
     ACC,
     Cerebellum,
-    STN,          // Subthalamic Nucleus - response inhibition
-    DLPFC,        // Dorsolateral prefrontal cortex - cognitive flexibility
-    MirrorSystem, // Mirror neuron system - action understanding & empathy
-    External,     // Input/output to outside world
+    STN,                 // Subthalamic Nucleus - response inhibition
+    DLPFC,               // Dorsolateral prefrontal cortex - cognitive flexibility
+    MirrorSystem,        // Mirror neuron system - action understanding & empathy
+    EntorhinalCortex,    // Spatial/contextual gateway to hippocampus
+    NucleusAccumbens,    // Reward processing hub
+    OrbitofrontalCortex, // Value-based decision making
+    External,            // Input/output to outside world
 }
 
 impl BrainRegion {
@@ -99,6 +102,9 @@ impl BrainRegion {
             BrainRegion::STN => "STN",
             BrainRegion::DLPFC => "DLPFC",
             BrainRegion::MirrorSystem => "MirrorSystem",
+            BrainRegion::EntorhinalCortex => "EntorhinalCortex",
+            BrainRegion::NucleusAccumbens => "NucleusAccumbens",
+            BrainRegion::OrbitofrontalCortex => "OrbitofrontalCortex",
             BrainRegion::External => "External",
         }
     }

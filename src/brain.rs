@@ -19,6 +19,7 @@ use crate::core::prediction::{
 };
 use crate::core::salience::{SalienceInputs, SalienceNetwork};
 use crate::core::social::{SocialCognition, TheoryOfMindState};
+use crate::core::strategy::{StrategyRegulator, StrategySignal};
 use crate::core::workspace::{Broadcast, GlobalWorkspace, WorkspaceConfig};
 use crate::error::{BrainError, Result};
 use crate::regions::acc::{ACC, ControlSignal};
@@ -31,12 +32,15 @@ use crate::regions::dlpfc::DLPFC;
 use crate::regions::dmn::{
     Belief, BeliefCategory, DefaultModeNetwork, Identity, ReflectionTrigger,
 };
+use crate::regions::entorhinal::EntorhinalCortex;
 use crate::regions::hippocampus::HippocampusStore;
 use crate::regions::hypothalamus::{DriveType, Hypothalamus};
 use crate::regions::insula::Insula;
 use crate::regions::language_cortex::{LanguageCortex, LanguageIntent, LanguageRepresentation};
 use crate::regions::mirror_system::MirrorSystem;
 use crate::regions::motor_cortex::{MotorCommand, MotorCortex};
+use crate::regions::nucleus_accumbens::NucleusAccumbens;
+use crate::regions::orbitofrontal::{OrbitofrontalCortex, OutcomeFeedback};
 use crate::regions::posterior_parietal::{MultimodalContext, PosteriorParietalCortex};
 use crate::regions::prefrontal::{PrefrontalConfig, PrefrontalCortex};
 use crate::regions::schema::{Schema, SchemaCategory, SchemaStats, SchemaStore};
@@ -196,6 +200,14 @@ pub struct Brain {
     pub mirror_system: MirrorSystem,
     /// Neuroplasticity (Hebbian learning, LTP/LTD, homeostatic regulation)
     pub plasticity: PlasticityEngine,
+    /// Entorhinal cortex (spatial/contextual gateway to hippocampus)
+    pub entorhinal: EntorhinalCortex,
+    /// Nucleus accumbens (reward processing hub)
+    pub nucleus_accumbens: NucleusAccumbens,
+    /// Orbitofrontal cortex (value-based decision making)
+    pub orbitofrontal: OrbitofrontalCortex,
+    /// Long-horizon strategy regulator
+    pub strategy: StrategyRegulator,
     /// Pending speech plans for externalization
     speech_queue: VecDeque<SpeechPlan>,
     /// Processing cycle count
@@ -279,8 +291,22 @@ impl Brain {
                 p.register_pathway(BrainRegion::PredictionEngine, BrainRegion::Hippocampus, 0.8);
                 p.register_pathway(BrainRegion::Prefrontal, BrainRegion::DLPFC, 0.85);
                 p.register_pathway(BrainRegion::ACC, BrainRegion::DLPFC, 0.8);
+                // New region pathways
+                p.register_pathway(BrainRegion::EntorhinalCortex, BrainRegion::Hippocampus, 0.9);
+                p.register_pathway(BrainRegion::Thalamus, BrainRegion::EntorhinalCortex, 0.85);
+                p.register_pathway(BrainRegion::NucleusAccumbens, BrainRegion::Prefrontal, 0.8);
+                p.register_pathway(
+                    BrainRegion::OrbitofrontalCortex,
+                    BrainRegion::NucleusAccumbens,
+                    0.85,
+                );
+                p.register_pathway(BrainRegion::Amygdala, BrainRegion::OrbitofrontalCortex, 0.8);
                 p
             },
+            entorhinal: EntorhinalCortex::new(),
+            nucleus_accumbens: NucleusAccumbens::new(),
+            orbitofrontal: OrbitofrontalCortex::new(),
+            strategy: StrategyRegulator::new(),
             speech_queue: VecDeque::new(),
             cycle_count: 0,
             last_interoceptive_alert: None,
@@ -720,14 +746,88 @@ impl Brain {
             }
         }
 
-        // 10. Neuromodulatory system homeostatic update
+        // 10. Entorhinal context encoding (provides episodic context for memory)
+        let context_frame = self.entorhinal.process_signal(&tagged_signal);
+        let context_signal = self.entorhinal.to_signal();
+        self.nervous_system.transmit(
+            BrainRegion::EntorhinalCortex,
+            BrainRegion::Hippocampus,
+            context_signal.clone(),
+        );
+        // Enrich memory with contextual tags from entorhinal cortex
+        if let Some(ref mut mem) = memory {
+            for tag in &context_frame.domain_tags {
+                mem.tag(tag.clone());
+            }
+        }
+
+        // 10.5 Nucleus accumbens reward processing
+        self.nucleus_accumbens
+            .set_dopamine(self.neuromodulators.state().dopamine);
+        if reached_consciousness {
+            let expected = if emotion.is_significant { 0.4 } else { 0.2 };
+            let magnitude = emotion.arousal.value() * 0.3
+                + if emotion.valence.is_positive() {
+                    0.2
+                } else {
+                    -0.1
+                };
+            let reward_event = self
+                .nucleus_accumbens
+                .process_reward(&content, magnitude, expected);
+
+            if reward_event.prediction_error.abs() > 0.3 {
+                let reward_signal = self.nucleus_accumbens.to_signal();
+                self.nervous_system.transmit(
+                    BrainRegion::NucleusAccumbens,
+                    BrainRegion::Prefrontal,
+                    reward_signal,
+                );
+            }
+        }
+
+        // 10.6 Mirror system processing for social content
+        if tagged_signal.content.as_str().is_some_and(|c| {
+            let lower = c.to_lowercase();
+            lower.contains("person")
+                || lower.contains("people")
+                || lower.contains("someone")
+                || lower.contains("they")
+                || lower.contains("help")
+                || lower.contains("said")
+                || lower.contains("told")
+                || lower.contains("asked")
+        }) {
+            let observed = crate::regions::mirror_system::ObservedAction {
+                agent_id: "observed_agent".to_string(),
+                action_name: content.clone(),
+                sub_actions: Vec::new(),
+                apparent_goal: None,
+                emotional_cues: tagged_signal.valence.value(),
+                context: context_frame.domain_tags.join(", "),
+                timestamp: chrono::Utc::now(),
+            };
+            let _understanding = self.mirror_system.observe_action(observed);
+            self.plasticity
+                .record_activation(BrainRegion::MirrorSystem, 0.6, "social_observation");
+        }
+
+        // 11. Neuromodulatory system homeostatic update
         self.neuromodulators.update();
         self.update_autonomic_cycle();
 
-        // 11. Cognitive flexibility cycle (dlPFC)
+        // 11.5 Strategy regulator update
+        let nm_state = self.neuromodulators.state();
+        let _strategy_update = self.strategy.update(StrategySignal::new(
+            nm_state.mood_stability,
+            nm_state.mood_stability,
+            nm_state.stress,
+        ));
+
+        // 12. Cognitive flexibility cycle (dlPFC)
         self.dlpfc.cycle();
 
-        // 12. Neuroplasticity: record activations and apply learning
+        // 13. Neuroplasticity: record activations and apply learning
         self.plasticity.record_activation(
             BrainRegion::Thalamus,
             tagged_signal.salience.value(),
@@ -747,6 +847,18 @@ impl Brain {
         if memory.is_some() {
             self.plasticity
                 .record_activation(BrainRegion::Hippocampus, 0.8, "encoding");
+            self.plasticity.record_activation(
+                BrainRegion::EntorhinalCortex,
+                0.7,
+                "context_encoding",
+            );
+        }
+        if reached_consciousness {
+            self.plasticity.record_activation(
+                BrainRegion::NucleusAccumbens,
+                0.6,
+                "reward_processing",
+            );
         }
         // Apply plasticity updates every 10 cycles
         if self.cycle_count.is_multiple_of(10) {
@@ -832,6 +944,11 @@ impl Brain {
 
         // Update hypothalamus sleep state and drives
         self.hypothalamus.sleep(hours);
+
+        // Nucleus accumbens rest (hedonic baseline recovery)
+        for _ in 0..sleep_cycles {
+            self.nucleus_accumbens.rest();
+        }
 
         let hours_factor = (hours / 8.0).clamp(0.0, 1.0);
         let consolidation_factor =
@@ -1807,6 +1924,32 @@ impl Brain {
             self.exploration_drive()
         ));
 
+        // Motivation
+        report.push_str("── MOTIVATION ────────────────────────────────────────────────\n");
+        let motivation = self.nucleus_accumbens.state();
+        report.push_str(&format!(
+            "Wanting:      {:.2} (incentive salience)\n",
+            motivation.wanting
+        ));
+        report.push_str(&format!(
+            "Liking:       {:.2} (hedonic response)\n",
+            motivation.liking
+        ));
+        report.push_str(&format!(
+            "Effort will.: {:.2} (willingness to work)\n",
+            motivation.effort_willingness
+        ));
+        report.push_str(&format!("Reward seek.: {}\n\n", motivation.reward_seeking));
+
+        // Context
+        report.push_str("── CONTEXT ───────────────────────────────────────────────────\n");
+        let ctx = self.entorhinal.current_context();
+        report.push_str(&format!("Domain: {}\n", ctx.domain_tags.join(", ")));
+        report.push_str(&format!(
+            "Stability: {:.2}, Coherence: {:.2}, Novelty: {:.2}\n\n",
+            ctx.stability, ctx.coherence, ctx.novelty
+        ));
+
         // Signal processing
         report.push_str("── SIGNAL PROCESSING ─────────────────────────────────────────\n");
         report.push_str(&format!("Signals processed: {}\n", stats.signals_processed));
@@ -2547,6 +2690,59 @@ impl Brain {
     /// Drain pending stop signals
     pub fn drain_stop_signals(&mut self) -> Vec<StopSignal> {
         self.stn.drain_signals()
+    }
+
+    // --- Entorhinal Cortex (Context) ---
+
+    /// Get the current contextual frame.
+    pub fn current_context(&self) -> &crate::regions::entorhinal::ContextFrame {
+        self.entorhinal.current_context()
+    }
+
+    /// Attempt context pattern completion from partial cues.
+    pub fn complete_context(
+        &mut self,
+        cues: &[String],
+    ) -> Option<crate::regions::entorhinal::ContextFrame> {
+        self.entorhinal.pattern_complete(cues)
+    }
+
+    // --- Nucleus Accumbens (Reward) ---
+
+    /// Get current motivational state from the reward hub.
+    pub fn motivational_state(&self) -> &crate::regions::nucleus_accumbens::MotivationalState {
+        self.nucleus_accumbens.state()
+    }
+
+    /// Evaluate whether an action is worth the effort.
+    pub fn is_effort_worth_it(&self, expected_reward: f64, required_effort: f64) -> bool {
+        self.nucleus_accumbens
+            .evaluate_effort_tradeoff(expected_reward, required_effort)
+            > 0.0
+    }
+
+    // --- Orbitofrontal Cortex (Value Decisions) ---
+
+    /// Evaluate options and get ranked recommendations.
+    pub fn evaluate_options(
+        &mut self,
+        options: &[&str],
+    ) -> Vec<crate::regions::orbitofrontal::Evaluation> {
+        self.orbitofrontal.evaluate(options)
+    }
+
+    /// Report an outcome for an action (credit assignment / learning).
+    pub fn report_outcome(&mut self, action: &str, outcome_value: f64) {
+        self.orbitofrontal.report_outcome(&OutcomeFeedback {
+            option_description: action.to_string(),
+            outcome_value,
+            context: self.entorhinal.current_context().domain_tags.clone(),
+        });
+    }
+
+    /// Get the current strategy profile.
+    pub fn strategy_profile(&self) -> crate::core::strategy::StrategyProfile {
+        self.strategy.profile()
     }
 
     // --- Persistence Methods ---

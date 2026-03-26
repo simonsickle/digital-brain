@@ -299,6 +299,30 @@ impl Thalamus {
                 // Motor signals typically don't need internal routing
                 destinations.push(Destination::Prefrontal);
             }
+            SignalType::Inhibition | SignalType::Regulation => {
+                destinations.push(Destination::Prefrontal);
+            }
+            SignalType::Social => {
+                destinations.push(Destination::Prefrontal);
+                destinations.push(Destination::Amygdala);
+            }
+            SignalType::Language => {
+                destinations.push(Destination::LanguageCortex);
+                destinations.push(Destination::Prefrontal);
+            }
+            SignalType::Interoceptive | SignalType::Drive => {
+                destinations.push(Destination::Prefrontal);
+                if signal.salience.is_high() {
+                    destinations.push(Destination::Workspace);
+                }
+            }
+            SignalType::Reward | SignalType::Evaluation => {
+                destinations.push(Destination::Prefrontal);
+            }
+            SignalType::Spatial => {
+                destinations.push(Destination::Hippocampus);
+                destinations.push(Destination::Prefrontal);
+            }
         }
 
         // High emotional content always goes to hippocampus

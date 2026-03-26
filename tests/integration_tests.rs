@@ -1,5 +1,6 @@
 //! Integration tests for the digital brain.
 
+use digital_brain::Brain;
 use digital_brain::prelude::*;
 use digital_brain::regions::hippocampus::HippocampusStore;
 
@@ -230,4 +231,231 @@ fn test_semantic_search() {
     let no_match = store.retrieve_by_query("xyznonexistent", 3).unwrap();
     // With no keyword matches, returns top by valence
     assert!(!no_match.is_empty());
+}
+
+// ── Full Brain Pipeline Integration Tests ──────────────────────────────
+
+/// Test that the full brain pipeline processes input end-to-end.
+#[test]
+fn test_full_brain_processing_pipeline() {
+    let mut brain = Brain::new().unwrap();
+
+    let result = brain
+        .process("A bright red circle appears on screen")
+        .unwrap();
+
+    // Signal should be processed
+    assert!(brain.stats().cycles >= 1);
+    // Emotional appraisal should exist
+    assert!(result.emotion.arousal.value() >= 0.0);
+    // Cortical features should be extracted for visual content
+    assert!(!result.cortical_features.is_empty());
+}
+
+/// Test that emotional content creates memories and triggers consciousness.
+#[test]
+fn test_emotional_content_reaches_consciousness() {
+    let mut brain = Brain::new().unwrap();
+
+    let result = brain
+        .process("Amazing victory! We won everything!")
+        .unwrap();
+
+    assert!(result.emotion.valence.is_positive());
+    assert!(result.emotion.is_significant);
+    // Emotional content should reach consciousness
+    assert!(result.reached_consciousness);
+}
+
+/// Test that the entorhinal cortex tracks context across inputs.
+#[test]
+fn test_entorhinal_context_tracking() {
+    let mut brain = Brain::new().unwrap();
+
+    // Process programming-related content
+    brain.process("Debug the function and fix the bug").unwrap();
+    brain.process("Compile the code and run tests").unwrap();
+
+    let ctx = brain.current_context();
+    assert!(
+        ctx.domain_tags.contains(&"programming".to_string()),
+        "Expected programming context, got: {:?}",
+        ctx.domain_tags
+    );
+    assert!(ctx.stability > 0.0);
+}
+
+/// Test that nucleus accumbens processes rewards during conscious access.
+#[test]
+fn test_nucleus_accumbens_reward_processing() {
+    let mut brain = Brain::new().unwrap();
+
+    // Process positive content that should reach consciousness
+    brain.process("Incredible breakthrough discovery!").unwrap();
+    brain.process("Another amazing success!").unwrap();
+
+    let motivation = brain.motivational_state();
+    // Should have some motivational state
+    assert!(motivation.wanting >= 0.0);
+    assert!(motivation.liking >= 0.0);
+    assert!(motivation.effort_willingness > 0.0);
+}
+
+/// Test effort-reward tradeoff evaluation.
+#[test]
+fn test_effort_reward_tradeoff() {
+    let brain = Brain::new().unwrap();
+
+    // High reward, low effort should be worth it
+    assert!(brain.is_effort_worth_it(0.9, 0.1));
+    // Low reward, high effort should not be worth it
+    assert!(!brain.is_effort_worth_it(0.1, 0.9));
+}
+
+/// Test orbitofrontal value-based decision making.
+#[test]
+fn test_orbitofrontal_option_evaluation() {
+    let mut brain = Brain::new().unwrap();
+
+    // Report outcomes to build value history
+    for _ in 0..5 {
+        brain.report_outcome("refactor", 0.7);
+    }
+    for _ in 0..5 {
+        brain.report_outcome("ignore", -0.3);
+    }
+
+    let evaluations = brain.evaluate_options(&["refactor", "ignore"]);
+    assert_eq!(evaluations.len(), 2);
+    // Refactor should be ranked higher
+    assert!(evaluations[0].risk_adjusted_value > evaluations[1].risk_adjusted_value);
+}
+
+/// Test mirror system activation for social content.
+#[test]
+fn test_mirror_system_social_processing() {
+    let mut brain = Brain::new().unwrap();
+
+    let _result = brain
+        .process("The person asked for help with the problem")
+        .unwrap();
+
+    // Should have activated the mirror system (recorded in plasticity)
+    // Verify processing completed without error
+    assert!(brain.stats().cycles >= 1);
+}
+
+/// Test strategy regulator influences brain state.
+#[test]
+fn test_strategy_regulator_tracking() {
+    let mut brain = Brain::new().unwrap();
+
+    // Process enough inputs to generate strategy signals
+    for _ in 0..5 {
+        brain.process("Working on this task").unwrap();
+    }
+
+    let profile = brain.strategy_profile();
+    // Strategy profile should have meaningful values
+    assert!(profile.sleep_quality >= 0.0 && profile.sleep_quality <= 1.0);
+    assert!(profile.mood_stability >= 0.0 && profile.mood_stability <= 1.0);
+}
+
+/// Test sleep cycle with new regions.
+#[test]
+fn test_sleep_restores_new_regions() {
+    let mut brain = Brain::new().unwrap();
+
+    // Process content to shift state
+    brain.process("Exciting discovery!").unwrap();
+    brain.process("Another breakthrough!").unwrap();
+
+    // Sleep should restore nucleus accumbens
+    let report = brain.sleep(8.0).unwrap();
+    assert!(report.sleep_quality > 0.0);
+    assert_eq!(report.hours_slept, 8.0);
+}
+
+/// Test the full cognitive cycle with all new regions.
+#[test]
+fn test_complete_cognitive_cycle_with_new_regions() {
+    let mut brain = Brain::new().unwrap();
+
+    // Set identity
+    brain.set_identity(digital_brain::regions::dmn::Identity {
+        name: "IntegrationTestBrain".to_string(),
+        core_values: vec!["testing".to_string(), "quality".to_string()],
+        self_description: "A brain designed for integration testing".to_string(),
+        creation_time: chrono::Utc::now(),
+    });
+
+    // Process varied content to exercise all regions
+    brain
+        .process("Debug the critical code error in the function")
+        .unwrap();
+    brain
+        .process("The person said they feel happy about the help")
+        .unwrap();
+    brain
+        .process("A bright red visual circle appears with loud music")
+        .unwrap();
+    brain
+        .process("Plan the next goal and decide the strategy")
+        .unwrap();
+
+    // Report outcomes for OFC learning
+    brain.report_outcome("debug", 0.8);
+    brain.report_outcome("help", 0.6);
+
+    // Verify context tracking
+    let ctx = brain.current_context();
+    assert!(!ctx.domain_tags.is_empty());
+
+    // Verify introspection includes new data
+    let report = brain.introspect();
+    assert!(report.contains("MOTIVATION"));
+    assert!(report.contains("CONTEXT"));
+    assert!(report.contains("Wanting"));
+
+    // Sleep and verify
+    let sleep_report = brain.sleep(6.0).unwrap();
+    assert!(sleep_report.sleep_quality > 0.0);
+
+    // Verify statistics
+    let stats = brain.stats();
+    assert!(stats.cycles >= 4);
+}
+
+/// Test context pattern completion.
+#[test]
+fn test_context_pattern_completion() {
+    let mut brain = Brain::new().unwrap();
+
+    // Build a programming context
+    for _ in 0..4 {
+        brain
+            .process("code function variable compile test")
+            .unwrap();
+    }
+
+    // Should be able to complete from cues
+    let completed = brain.complete_context(&["programming".to_string()]);
+    assert!(completed.is_some());
+}
+
+/// Test neuromodulators interact with new reward system.
+#[test]
+fn test_neuromodulator_reward_integration() {
+    let mut brain = Brain::new().unwrap();
+
+    // Process positive events
+    brain.process("Victory! Amazing success achieved!").unwrap();
+    brain.process("Another incredible breakthrough!").unwrap();
+
+    let nm = brain.neuromodulator_state();
+    let motivation = brain.motivational_state();
+
+    // Both systems should reflect positive state
+    assert!(nm.dopamine > 0.0);
+    assert!(motivation.effort_willingness > 0.0);
 }

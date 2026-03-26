@@ -21,6 +21,9 @@
 //! - **language_cortex**: Linguistic comprehension and inner speech grounding
 //! - **temporal_cortex**: Semantic association and meaning integration
 //! - **broca**: Speech planning and language production
+//! - **entorhinal**: Spatial/contextual gateway to hippocampus (grid cells, pattern separation)
+//! - **nucleus_accumbens**: Reward processing hub (hedonic adaptation, incentive salience)
+//! - **orbitofrontal**: Value-based decision making (outcome evaluation, reversal learning)
 
 pub mod acc;
 pub mod amygdala;
@@ -30,12 +33,15 @@ pub mod broca;
 pub mod cerebellum;
 pub mod dlpfc;
 pub mod dmn;
+pub mod entorhinal;
 pub mod hippocampus;
 pub mod hypothalamus;
 pub mod insula;
 pub mod language_cortex;
 pub mod mirror_system;
 pub mod motor_cortex;
+pub mod nucleus_accumbens;
+pub mod orbitofrontal;
 pub mod posterior_parietal;
 pub mod prefrontal;
 pub mod schema;
@@ -56,6 +62,9 @@ pub use dlpfc::{
     CognitiveRule, DLPFC, DlpfcConfig, DlpfcStats, InhibitionOutcome, SetShiftResult, TaskSet,
 };
 
+pub use entorhinal::{
+    ContextFrame, EntorhinalConfig, EntorhinalCortex, EntorhinalStats, SeparationResult,
+};
 pub use hypothalamus::{
     CircadianPhase, CircadianRhythm, DriveState, DriveType, Hypothalamus, HypothalamusConfig,
     HypothalamusStats, MotivationSummary, StressResponse,
@@ -73,6 +82,13 @@ pub use mirror_system::{
     MirrorSystemStats, ObservedAction,
 };
 pub use motor_cortex::{MotorCommand, MotorCortex, MotorStep};
+pub use nucleus_accumbens::{
+    MotivationalState, NucleusAccumbens, NucleusAccumbensConfig, NucleusAccumbensStats, RewardEvent,
+};
+pub use orbitofrontal::{
+    Evaluation, OrbitofrontalConfig, OrbitofrontalCortex, OrbitofrontalStats, OutcomeFeedback,
+    ValuedOption,
+};
 pub use posterior_parietal::{MultimodalContext, PosteriorParietalCortex};
 pub use sensory_cortex::{
     AuditoryCortex, CorticalRepresentation, GustatoryCortex, OlfactoryCortex, SensoryModality,
